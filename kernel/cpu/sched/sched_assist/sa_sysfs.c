@@ -296,9 +296,7 @@ static const struct proc_ops proc_debug_enabled_fops = {
 static int im_flag_set_handle(struct task_struct *task, int im_flag)
 {
 	struct oplus_task_struct *ots = get_oplus_task_struct(task);
-	int old_im;
 
-	old_im = ots->im_flag;
 	ots->im_flag = im_flag;
 
 	switch (ots->im_flag) {
@@ -308,11 +306,6 @@ static int im_flag_set_handle(struct task_struct *task, int im_flag)
 	default:
 		break;
 	}
-
-	/* Optimization of ams/wsm lock contention */
-	if ((old_im != im_flag) && (old_im == IM_FLAG_SS_LOCK_OWNER ||
-		im_flag == IM_FLAG_SS_LOCK_OWNER))
-		opt_ss_lock_contention(task, old_im, im_flag);
 
 	return 0;
 }
@@ -374,16 +367,13 @@ static ssize_t proc_im_flag_write(struct file *file, const char __user *buf,
 		if (pid > 0 && pid <= PID_MAX_DEFAULT) {
 			rcu_read_lock();
 			task = find_task_by_vpid(pid);
-			if (task)
-				get_task_struct(task);
-			rcu_read_unlock();
-
 			if (task) {
+				get_task_struct(task);
 				im_flag_set_handle(task, im_flag);
 				put_task_struct(task);
-			} else {
+			} else
 				ux_debug("Can not find task with pid=%d", pid);
-			}
+			rcu_read_unlock();
 		}
 	}
 

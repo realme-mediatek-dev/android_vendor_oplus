@@ -12,7 +12,6 @@
 
 #include <../kernel/oplus_cpu/sched/sched_assist/sa_common.h>
 #include "frame_boost.h"
-#include "frame_debug.h"
 #include "cluster_boost.h"
 
 static struct proc_dir_entry *frame_boost_proc;
@@ -73,7 +72,7 @@ static long ofb_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		if (data.stage == BOOST_FRAME_START) {
 			set_frame_state(FRAME_START);
-			rollover_frame_group_window(DEFAULT_FRAME_GROUP_ID);
+			rollover_frame_group_window(false);
 			default_group_update_cpufreq();
 		}
 
@@ -118,57 +117,6 @@ static long ofb_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	return ret;
 }
 
-static long fbg_add_task_to_group(void __user *uarg)
-{
-	struct ofb_key_thread_info info;
-	unsigned int thread_num;
-	unsigned int i;
-
-	if (uarg == NULL)
-		return -EINVAL;
-
-	if (copy_from_user(&info, uarg, sizeof(struct ofb_key_thread_info))) {
-		ofb_debug("%s: copy_from_user fail\n", __func__);
-		return -EFAULT;
-	}
-
-	/* sanity check a loop boundary */
-	thread_num = info.thread_num;
-	if (thread_num > MAX_KEY_THREAD_NUM)
-		thread_num = MAX_KEY_THREAD_NUM;
-
-	for (i = 0; i < thread_num; i++)
-		add_task_to_game_frame_group(info.tid[i], info.add);
-
-	return 0;
-}
-
-static void get_frame_util_info(struct ofb_frame_util_info *info)
-{
-	memset(info, 0, sizeof(struct ofb_frame_util_info));
-	fbg_get_frame_scale(&info->frame_scale);
-	fbg_get_frame_busy(&info->frame_busy);
-}
-
-static long fbg_notify_frame_start(void __user *uarg)
-{
-	struct ofb_frame_util_info info;
-
-	if (uarg == NULL)
-		return -EINVAL;
-
-	set_frame_state(FRAME_START);
-	rollover_frame_group_window(GAME_FRAME_GROUP_ID);
-
-	get_frame_util_info(&info);
-	if (copy_to_user(uarg, &info, sizeof(struct ofb_frame_util_info))) {
-		ofb_debug("%s: copy_to_user fail\n", __func__);
-		return -EFAULT;
-	}
-
-	return 0;
-}
-
 static bool is_ofb_extra_cmd(unsigned int cmd)
 {
 	return _IOC_TYPE(cmd) == OFB_EXTRA_MAGIC;
@@ -176,18 +124,17 @@ static bool is_ofb_extra_cmd(unsigned int cmd)
 
 static long handle_ofb_extra_cmd(unsigned int cmd, void __user *uarg)
 {
+	long ret = 0;
+
 	switch (cmd) {
 	case CMD_ID_SET_TASK_PREFERED_CLUSTER:
 		return fbg_set_task_preferred_cluster(uarg);
-	case CMD_ID_ADD_TASK_TO_GROUP:
-		return fbg_add_task_to_group(uarg);
-	case CMD_ID_NOTIFY_FRAME_START:
-		return fbg_notify_frame_start(uarg);
 	default:
-		return -ENOTTY;
+		ret = -ENOTTY;
+		break;
 	}
 
-	return 0;
+	return ret;
 }
 
 static long ofb_sys_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
@@ -217,7 +164,7 @@ static long ofb_sys_ioctl(struct file *file, unsigned int cmd, unsigned long arg
 			set_ui_thread(data.pid, data.tid);
 			set_render_thread(data.pid, data.tid);
 			set_frame_state(FRAME_END);
-			rollover_frame_group_window(DEFAULT_FRAME_GROUP_ID);
+			rollover_frame_group_window(false);
 		}
 
 		if (data.stage == BOOST_ALL_STAGE) {
@@ -238,7 +185,7 @@ static long ofb_sys_ioctl(struct file *file, unsigned int cmd, unsigned long arg
 		break;
 	case CMD_ID_SET_SF_MSG_TRANS:
 		if (data.stage == BOOST_MSG_TRANS_START)
-			rollover_frame_group_window(SF_FRAME_GROUP_ID);
+			rollover_frame_group_window(true);
 
 		if (data.stage == BOOST_CLIENT_COMPOSITION) {
 			bool boost_allow = true;

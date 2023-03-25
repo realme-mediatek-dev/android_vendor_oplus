@@ -65,7 +65,6 @@ struct sensor_fb_conf g_fb_conf[] = {
 	{ALS_FIRST_REPORT_DELAY_COUNT_ID, "device_als_rpt_delay", SENSOR_DEBUG_DEVICE_TYPE},
 	{ALS_ORIGIN_DATA_TO_ZERO_ID, "device_als_to_zero", SENSOR_DEBUG_DEVICE_TYPE},
 	{ALS_CALI_DATA_ID, "device_als_cali_data", SENSOR_DEBUG_DEVICE_TYPE},
-	{ALS_CG_RPT_INFO_ID, "device_als_cg_rpt_info", SENSOR_DEBUG_DEVICE_TYPE},
 
 
 	{ACCEL_INIT_FAIL_ID, "device_acc_init_fail", SENSOR_DEVICE_TYPE},
@@ -77,18 +76,8 @@ struct sensor_fb_conf g_fb_conf[] = {
 	{ACCEL_ORIGIN_DATA_TO_ZERO_ID, "device_acc_to_zero", SENSOR_DEBUG_DEVICE_TYPE},
 	{ACCEL_CALI_DATA_ID, "device_acc_cali_data", SENSOR_DEBUG_DEVICE_TYPE},
 	{ACCEL_DATA_BLOCK_ID, "device_acc_data_block", SENSOR_DEBUG_DEVICE_TYPE},
-	{ACCEL_SUB_DATA_BLOCK_ID, "device_sub_acc_data_block", SENSOR_DEBUG_DEVICE_TYPE},
 	{ACCEL_DATA_FULL_RANGE_ID, "device_acc_data_full_range", SENSOR_DEBUG_DEVICE_TYPE},
 
-	{ACCEL_SUB_INIT_FAIL_ID, "device_acc_sub_init_fail", SENSOR_DEVICE_TYPE},
-	{ACCEL_SUB_I2C_ERR_ID, "device_acc_sub_i2c_err", SENSOR_DEVICE_TYPE},
-	{ACCEL_SUB_ALLOC_FAIL_ID, "device_acc_sub_alloc_fail", SENSOR_DEVICE_TYPE},
-	{ACCEL_SUB_ESD_REST_ID, "device_acc_sub_esd_reset", SENSOR_DEVICE_TYPE},
-	{ACCEL_SUB_NO_INTERRUPT_ID, "device_acc_sub_no_irq", SENSOR_DEVICE_TYPE},
-	{ACCEL_SUB_FIRST_REPORT_DELAY_COUNT_ID, "device_acc_sub_rpt_delay", SENSOR_DEBUG_DEVICE_TYPE},
-	{ACCEL_SUB_ORIGIN_DATA_TO_ZERO_ID, "device_acc_sub_to_zero", SENSOR_DEBUG_DEVICE_TYPE},
-	{ACCEL_SUB_CALI_DATA_ID, "device_acc_sub_cali_data", SENSOR_DEBUG_DEVICE_TYPE},
-	{ACCEL_SUB_DATA_FULL_RANGE_ID, "device_acc_sub_data_full_range", SENSOR_DEBUG_DEVICE_TYPE},
 
 	{GYRO_INIT_FAIL_ID, "device_gyro_init_fail", SENSOR_DEVICE_TYPE},
 	{GYRO_I2C_ERR_ID, "device_gyro_i2c_err", SENSOR_DEVICE_TYPE},
@@ -98,17 +87,7 @@ struct sensor_fb_conf g_fb_conf[] = {
 	{GYRO_FIRST_REPORT_DELAY_COUNT_ID, "device_gyro_rpt_delay", SENSOR_DEBUG_DEVICE_TYPE},
 	{GYRO_ORIGIN_DATA_TO_ZERO_ID, "device_gyro_to_zero", SENSOR_DEBUG_DEVICE_TYPE},
 	{GYRO_CALI_DATA_ID, "device_gyro_cali_data", SENSOR_DEBUG_DEVICE_TYPE},
-	{GYRO_DATA_BLOCK_ID, "device_gyro_data_block", SENSOR_DEBUG_DEVICE_TYPE},
 
-	{GYRO_SUB_INIT_FAIL_ID, "device_gyro_sub_init_fail", SENSOR_DEVICE_TYPE},
-	{GYRO_SUB_I2C_ERR_ID, "device_gyro_sub_i2c_err", SENSOR_DEVICE_TYPE},
-	{GYRO_SUB_ALLOC_FAIL_ID, "device_gyro_sub_alloc_fail", SENSOR_DEVICE_TYPE},
-	{GYRO_SUB_ESD_REST_ID, "device_gyro_sub_esd_reset", SENSOR_DEVICE_TYPE},
-	{GYRO_SUB_NO_INTERRUPT_ID, "device_gyro_sub_no_irq", SENSOR_DEVICE_TYPE},
-	{GYRO_SUB_FIRST_REPORT_DELAY_COUNT_ID, "device_gyro_sub_rpt_delay", SENSOR_DEBUG_DEVICE_TYPE},
-	{GYRO_SUB_ORIGIN_DATA_TO_ZERO_ID, "device_gyro_sub_to_zero", SENSOR_DEBUG_DEVICE_TYPE},
-	{GYRO_SUB_CALI_DATA_ID, "device_gyro_sub_cali_data", SENSOR_DEBUG_DEVICE_TYPE},
-	{GYRO_SUB_DATA_BLOCK_ID, "device_gyro_sub_data_block", SENSOR_DEBUG_DEVICE_TYPE},
 
 	{MAG_INIT_FAIL_ID, "device_mag_init_fail", SENSOR_DEVICE_TYPE},
 	{MAG_I2C_ERR_ID, "device_mag_i2c_err", SENSOR_DEVICE_TYPE},
@@ -118,8 +97,6 @@ struct sensor_fb_conf g_fb_conf[] = {
 	{MAG_FIRST_REPORT_DELAY_COUNT_ID, "device_mag_rpt_delay", SENSOR_DEBUG_DEVICE_TYPE},
 	{MAG_ORIGIN_DATA_TO_ZERO_ID, "device_mag_to_zero", SENSOR_DEBUG_DEVICE_TYPE},
 	{MAG_CALI_DATA_ID, "device_mag_cali_data", SENSOR_DEBUG_DEVICE_TYPE},
-	{MAG_DATA_BLOCK_ID, "device_mag_data_block_data", SENSOR_DEBUG_DEVICE_TYPE},
-	{MAG_DATA_FULL_RANGE_ID, "device_mag_data_full_range", SENSOR_DEBUG_DEVICE_TYPE},
 
 
 	{SAR_INIT_FAIL_ID, "device_sar_init_fail", SENSOR_DEVICE_TYPE},
@@ -131,13 +108,6 @@ struct sensor_fb_conf g_fb_conf[] = {
 	{SAR_ORIGIN_DATA_TO_ZERO_ID, "device_sar_to_zero", SENSOR_DEBUG_DEVICE_TYPE},
 	{SAR_CALI_DATA_ID, "device_sar_cali_data", SENSOR_DEBUG_DEVICE_TYPE},
 
-	{BAROMETER_I2C_ERR_ID, "device_barometer_i2c_err", SENSOR_DEVICE_TYPE},
-
-	{HALL_I2C_ERR_ID, "device_hall_i2c_err", SENSOR_DEVICE_TYPE},
-
-	{FOLD_DEVICE_FOLDE_COUNT_ID, "device_fold_count", SENSOR_DEVICE_TYPE},
-
-	{FREE_FALL_TRIGGER_ID, "device_free_fall", SENSOR_DEVICE_TYPE},
 
 	{POWER_SENSOR_INFO_ID, "debug_power_sns_info", SENSOR_DEBUG_POWER_TYPE},
 	{POWER_ACCEL_INFO_ID, "debug_power_acc_info", SENSOR_DEBUG_POWER_TYPE},
@@ -417,11 +387,10 @@ static int parse_shr_info(struct sensor_fb_cxt *sensor_fb_cxt)
 			sensor_fb_cxt->fb_smem.event[count].buff[1],
 			sensor_fb_cxt->fb_smem.event[count].buff[2]);
 		fb_len += scnprintf(payload, sizeof(payload),
-				"NULL$$EventField@@%s$$FieldData@@%d$$detailData@@%s$$SensorName@@0x%x",
+				"NULL$$EventField@@%s$$FieldData@@%d$$detailData@@%s",
 				g_fb_conf[index].fb_field,
 				sensor_fb_cxt->fb_smem.event[count].count,
-				detail_buff,
-				sensor_fb_cxt->fb_smem.event[count].name);
+				detail_buff);
 		pr_info("payload =%s\n", payload);
 #if defined(CONFIG_OPLUS_FEATURE_FEEDBACK) || defined(CONFIG_OPLUS_FEATURE_FEEDBACK_MODULE)
 		oplus_kevent_fb(FB_SENSOR, g_fb_conf[index].fb_event_id, payload);

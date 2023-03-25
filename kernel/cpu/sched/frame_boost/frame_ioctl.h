@@ -97,6 +97,16 @@ struct ofb_ctrl_data {
 	int related_depth;
 };
 
+enum ofb_ctrl_extra_cmd_id {
+	SET_TASK_PREFERED_CLUSTER = 1
+};
+
+struct ofb_ctrl_cluster {
+	pid_t tid;
+	int cluster_id;
+	char reserved[32];
+};
+
 #define OFB_MAGIC 0XDE
 #define CMD_ID_SET_FPS \
 	_IOWR(OFB_MAGIC, SET_FPS, struct ofb_ctrl_data)
@@ -117,37 +127,9 @@ struct ofb_ctrl_data {
 #define CMD_ID_RELATED_SCHED_CONFIG \
 	_IOWR(OFB_MAGIC, RELATED_SCHED_CONFIG, struct ofb_ctrl_data)
 
-enum ofb_ctrl_extra_cmd_id {
-	SET_TASK_PREFERED_CLUSTER = 1,
-	ADD_TASK_TO_GROUP = 2,
-	NOTIFY_FRAME_START = 3,
-};
-
-struct ofb_ctrl_cluster {
-	pid_t tid;
-	int cluster_id;
-	char reserved[32];
-};
-
-#define MAX_KEY_THREAD_NUM	20
-struct ofb_key_thread_info {
-	pid_t tid[MAX_KEY_THREAD_NUM];
-	unsigned int thread_num;
-	unsigned int add; /* 1 add, 0 remove */
-};
-
-struct ofb_frame_util_info {
-	unsigned long frame_scale;
-	unsigned int frame_busy;
-};
-
 #define OFB_EXTRA_MAGIC 0XDF
 #define CMD_ID_SET_TASK_PREFERED_CLUSTER \
 	_IOWR(OFB_EXTRA_MAGIC, SET_TASK_PREFERED_CLUSTER, struct ofb_ctrl_cluster)
-#define CMD_ID_ADD_TASK_TO_GROUP \
-	_IOWR(OFB_EXTRA_MAGIC, ADD_TASK_TO_GROUP, struct ofb_key_thread_info)
-#define CMD_ID_NOTIFY_FRAME_START \
-	_IOWR(OFB_EXTRA_MAGIC, NOTIFY_FRAME_START, struct ofb_frame_util_info)
 
 extern int frame_ioctl_init(void);
 #endif /* _SCHED_ASSIST_IOCTL_H_ */

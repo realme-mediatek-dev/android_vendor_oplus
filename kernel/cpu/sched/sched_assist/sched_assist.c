@@ -10,15 +10,11 @@
 #include <kernel/sched/sched.h>
 #include <trace/hooks/cgroup.h>
 #include <trace/hooks/signal.h>
-
 #include "sched_assist.h"
 #include "sa_common.h"
 #include "sa_sysfs.h"
 #include "sa_exec.h"
 #include "sa_fair.h"
-#ifdef CONFIG_LOCKING_PROTECT
-#include "sched_assist_locking.h"
-#endif
 
 static int register_scheduler_vendor_hooks(void)
 {
@@ -61,15 +57,6 @@ static int register_scheduler_vendor_hooks(void)
 	REGISTER_TRACE_VH(android_vh_cgroup_set_task, android_vh_cgroup_set_task_handler);
 	/* register vendor hook in kernel/signal.c  */
 	REGISTER_TRACE_VH(android_vh_do_send_sig_info, android_vh_do_send_sig_handler);
-
-#ifdef CONFIG_LOCKING_PROTECT
-	sched_assist_locking_init();
-#endif
-
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_BAN_APP_SET_AFFINITY)
-	/* register vendor hook in kernel/core.c */
-	REGISTER_TRACE_VH(android_vh_sched_setaffinity_early, android_vh_sched_setaffinity_early_handler);
-#endif
 	return 0;
 }
 

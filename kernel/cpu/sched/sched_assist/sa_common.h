@@ -61,9 +61,6 @@
 #define SA_LAUNCHER_SI				(1 << 6)
 #define SA_SCENE_OPT_SET			(1 << 7)
 
-#define  FIRST_APPLICATION_UID  10000
-#define  LAST_APPLICATION_UID   19999
-
 extern pid_t save_audio_tgid;
 extern pid_t save_top_app_tgid;
 extern unsigned int top_app_type;
@@ -83,7 +80,6 @@ enum INHERIT_UX_TYPE {
 	INHERIT_UX_BINDER = 0,
 	INHERIT_UX_RWSEM,
 	INHERIT_UX_MUTEX,
-	INHERIT_UX_FUTEX,
 	INHERIT_UX_MAX,
 };
 
@@ -99,8 +95,6 @@ enum IM_FLAG_TYPE {
 	IM_FLAG_HWBINDER,
 	IM_FLAG_LAUNCHER,
 	IM_FLAG_LAUNCHER_NON_UX_RENDER,
-	IM_FLAG_SS_LOCK_OWNER,
-	IM_FLAG_FORBID_SET_CPU_AFFINITY, /* forbid setting cpu affinity from app */
 	MAX_IM_FLAG_TYPE,
 };
 
@@ -124,16 +118,6 @@ struct task_record {
 #define RECOED_WINIDX_MASK		(RECOED_WINSIZE - 1)
 	u8 winidx;
 	u8 count;
-};
-#endif
-
-#if IS_ENABLED(CONFIG_OPLUS_LOCKING_STRATEGY)
-struct locking_info {
-	u64 waittime_stamp;
-	u64 holdtime_stamp;
-	struct task_struct *holder;
-	u32 waittype;
-	bool ux_contrib;
 };
 #endif
 
@@ -166,28 +150,15 @@ struct oplus_task_struct {
 	struct list_head fbg_list;
 	unsigned int fbg_state;
 	int fbg_depth;
-	bool fbg_running; /* task belongs to a group, and in running */
 	int preferred_cluster_id;
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_FDLEAK_CHECK)
 	unsigned int fdleak_flag;
-#endif
-#ifdef CONFIG_LOCKING_PROTECT
-	unsigned long locking_start_time;
-	struct list_head locking_entry;
-	int locking_depth;
-#endif
-#if IS_ENABLED(CONFIG_OPLUS_LOCKING_STRATEGY)
-	struct locking_info lkinfo;
 #endif
 };
 
 struct oplus_rq {
 	/* CONFIG_OPLUS_FEATURE_SCHED_ASSIST */
 	struct list_head ux_list;
-#ifdef CONFIG_LOCKING_PROTECT
-	struct list_head locking_thread_list;
-	int rq_locking_task;
-#endif
 };
 
 extern int global_debug_enabled;
@@ -339,14 +310,6 @@ static inline void init_task_ux_info(struct task_struct *t)
 	ots->target_process = -1;
 	ots->wake_tid = 0;
 	ots->running_start_time = 0;
-#ifdef CONFIG_LOCKING_PROTECT
-	INIT_LIST_HEAD(&ots->locking_entry);
-	ots->locking_start_time = 0;
-	ots->locking_depth = 0;
-#endif
-#if IS_ENABLED(CONFIG_OPLUS_LOCKING_STRATEGY)
-	memset(&ots->lkinfo, 0, sizeof(struct locking_info));
-#endif
 }
 
 static inline bool test_sched_assist_ux_type(struct task_struct *task, unsigned int sa_ux_type)
@@ -436,7 +399,6 @@ void adjust_rt_lowest_mask(struct task_struct *p, struct cpumask *local_cpu_mask
 bool sa_skip_rt_sync(struct rq *rq, struct task_struct *p, bool *sync);
 
 void account_ux_runtime(struct rq *rq, struct task_struct *curr);
-void opt_ss_lock_contention(struct task_struct *p, int old_im, int new_im);
 
 /* register vender hook in kernel/sched/topology.c */
 void android_vh_build_sched_domains_handler(void *unused, bool has_asym);
@@ -456,9 +418,4 @@ void android_vh_scheduler_tick_handler(void *unused, struct rq *rq);
 void android_vh_cgroup_set_task_handler(void *unused, int ret, struct task_struct *task);
 /* register vendor hook in kernel/signal.c  */
 void android_vh_do_send_sig_handler(void *unused, int sig, struct task_struct *cur, struct task_struct *p);
-
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_BAN_APP_SET_AFFINITY)
-void android_vh_sched_setaffinity_early_handler(void *unused, struct task_struct *task, const struct cpumask *new_mask, int *skip);
-#endif
-
 #endif /* _OPLUS_SA_COMMON_H_ */

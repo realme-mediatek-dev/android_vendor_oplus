@@ -204,9 +204,6 @@ void binder_alloc_handler(void *data, size_t size, struct binder_alloc *alloc, i
 
 void send_signal_handler(void *data, int sig, struct task_struct *killer, struct task_struct *dst)
 {
-	if (!dst || !killer) {
-		return;
-	}
 	if (is_frozen_tg(dst)  /*signal receiver thread group is frozen?*/
 		&& (sig == SIGKILL || sig == SIGTERM || sig == SIGABRT || sig == SIGQUIT)) {
 		if (hans_report(SIGNAL, task_tgid_nr(killer), task_uid(killer).val, task_tgid_nr(dst), task_uid(dst).val, "signal", -1) == HANS_ERROR) {

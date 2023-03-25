@@ -17,6 +17,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/cpumask.h>
 #include <linux/cpuset.h>
+#include <linux/cred.h>
 #include "jank_cpuloadmonitor.h"
 #include "jank_netlink.h"
 
@@ -905,6 +906,7 @@ static void get_current_task_mask(u32 type)
 	uid_t uid;
 	pid_t tgid;
 	unsigned long cpumask = get_mask_bytype(type);
+	const struct cred *tcred;
 
 	for (cpu = 0; cpu < CPU_NUMS; cpu++) {
 		struct rq *rq_cur = NULL;
@@ -927,7 +929,12 @@ static void get_current_task_mask(u32 type)
 
 		get_task_struct(p);
 		curr_pid = p->pid;
-		uid = task_uid(p).val;
+
+		rcu_read_lock();
+		tcred = __task_cred(p);
+		uid = __kuid_val(tcred->uid);
+		rcu_read_unlock();
+
 		tgid = p->tgid;
 		put_task_struct(p);
 		pr_info("cpuload: pid=%d, uid=%d, tgid=%d\n", curr_pid, uid, tgid);
@@ -948,6 +955,7 @@ static void get_current_thread_mask(u32 type)
 	uid_t uid;
 	pid_t tgid;
 	unsigned long cpumask = get_mask_bytype(type);
+	const struct cred *tcred;
 
 	for (cpu = 0; cpu < CPU_NUMS; cpu++) {
 		struct rq *rq_cur = NULL;
@@ -971,7 +979,12 @@ static void get_current_thread_mask(u32 type)
 
 		get_task_struct(p);
 		curr_pid = p->pid;
-		uid = task_uid(p).val;
+
+		rcu_read_lock();
+		tcred = __task_cred(p);
+		uid = __kuid_val(tcred->uid);
+		rcu_read_unlock();
+
 		tgid = p->tgid;
 		put_task_struct(p);
 		pr_info("cpuload: pid=%d, uid=%d, tgid=%d\n", curr_pid, uid, tgid);

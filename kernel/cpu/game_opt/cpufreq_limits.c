@@ -28,19 +28,6 @@ static DEFINE_PER_CPU(struct freq_qos_request, qos_req_max);
 static cpumask_var_t limit_mask_min;
 static cpumask_var_t limit_mask_max;
 
-static atomic_t disable_cpufreq_limit = ATOMIC_INIT(0);
-static DEFINE_MUTEX(g_mutex);
-
-/*
- * This is a safeguard mechanism.
- *
- * If GPA made frequency QoS request but not released under some extreme conditions.
- * Kernel releases the frequency QoS request after FREQ_QOS_REQ_MAX_MS.
- * It will probably never happen.
- */
-#define FREQ_QOS_REQ_MAX_MS  (60 * MSEC_PER_SEC) /* 60s */
-static struct delayed_work freq_qos_req_reset_work;
-
 static int freq_qos_request_init(void)
 {
 	unsigned int cpu;
@@ -57,7 +44,7 @@ static int freq_qos_request_init(void)
 			ret = -EINVAL;
 			goto cleanup;
 		}
-		per_cpu(game_cpu_stats, cpu).min = FREQ_QOS_MIN_DEFAULT_VALUE;
+		per_cpu(game_cpu_stats, cpu).min = 0;
 		req = &per_cpu(qos_req_min, cpu);
 		ret = freq_qos_add_request(&policy->constraints, req,
 			FREQ_QOS_MIN, FREQ_QOS_MIN_DEFAULT_VALUE);
@@ -68,7 +55,7 @@ static int freq_qos_request_init(void)
 			goto cleanup;
 		}
 
-		per_cpu(game_cpu_stats, cpu).max = FREQ_QOS_MAX_DEFAULT_VALUE;
+		per_cpu(game_cpu_stats, cpu).max = UINT_MAX;
 		req = &per_cpu(qos_req_max, cpu);
 		ret = freq_qos_add_request(&policy->constraints, req,
 			FREQ_QOS_MAX, FREQ_QOS_MAX_DEFAULT_VALUE);
@@ -89,37 +76,15 @@ cleanup:
 		if (req && freq_qos_request_active(req))
 			freq_qos_remove_request(req);
 
+
 		req = &per_cpu(qos_req_max, cpu);
 		if (req && freq_qos_request_active(req))
 			freq_qos_remove_request(req);
 
-		per_cpu(game_cpu_stats, cpu).min = FREQ_QOS_MIN_DEFAULT_VALUE;
-		per_cpu(game_cpu_stats, cpu).max = FREQ_QOS_MAX_DEFAULT_VALUE;
+		per_cpu(game_cpu_stats, cpu).min = 0;
+		per_cpu(game_cpu_stats, cpu).max = UINT_MAX;
 	}
 	return ret;
-}
-
-static void __freq_qos_request_reset(void)
-{
-	unsigned int cpu;
-	struct freq_qos_request *req;
-
-	mutex_lock(&g_mutex);
-	for_each_present_cpu(cpu) {
-		req = &per_cpu(qos_req_min, cpu);
-		freq_qos_update_request(req, FREQ_QOS_MIN_DEFAULT_VALUE);
-		per_cpu(game_cpu_stats, cpu).min = FREQ_QOS_MIN_DEFAULT_VALUE;
-
-		req = &per_cpu(qos_req_max, cpu);
-		freq_qos_update_request(req, FREQ_QOS_MAX_DEFAULT_VALUE);
-		per_cpu(game_cpu_stats, cpu).max = FREQ_QOS_MAX_DEFAULT_VALUE;
-	}
-	mutex_unlock(&g_mutex);
-}
-
-static void freq_qos_request_reset(struct work_struct *work)
-{
-	__freq_qos_request_reset();
 }
 
 static ssize_t set_cpu_min_freq(const char *buf, size_t count)
@@ -193,31 +158,20 @@ static ssize_t cpu_min_freq_proc_write(struct file *file, const char __user *buf
 	char page[256] = {0};
 	int ret;
 
-	if (unlikely(atomic_read(&disable_cpufreq_limit) == 1))
-		return count;
-
 	ret = simple_write_to_buffer(page, sizeof(page) - 1, ppos, buf, count);
 	if (ret <= 0)
 		return ret;
 
-	cancel_delayed_work_sync(&freq_qos_req_reset_work);
-	mutex_lock(&g_mutex);
-	ret = set_cpu_min_freq(page, ret);
-	mutex_unlock(&g_mutex);
-	schedule_delayed_work(&freq_qos_req_reset_work, msecs_to_jiffies(FREQ_QOS_REQ_MAX_MS));
-
-	return ret;
+	return set_cpu_min_freq(page, ret);
 }
 
 static int cpu_min_freq_show(struct seq_file *m, void *v)
 {
 	int cpu;
 
-	mutex_lock(&g_mutex);
 	for_each_present_cpu(cpu)
 		seq_printf(m, "%d:%u ", cpu, per_cpu(game_cpu_stats, cpu).min);
 	seq_printf(m, "\n");
-	mutex_unlock(&g_mutex);
 
 	return 0;
 }
@@ -298,31 +252,20 @@ static ssize_t cpu_max_freq_proc_write(struct file *file, const char __user *buf
 	char page[256] = {0};
 	int ret;
 
-	if (unlikely(atomic_read(&disable_cpufreq_limit) == 1))
-		return count;
-
 	ret = simple_write_to_buffer(page, sizeof(page) - 1, ppos, buf, count);
 	if (ret <= 0)
 		return ret;
 
-	cancel_delayed_work_sync(&freq_qos_req_reset_work);
-	mutex_lock(&g_mutex);
-	ret = set_cpu_max_freq(page, ret);
-	mutex_unlock(&g_mutex);
-	schedule_delayed_work(&freq_qos_req_reset_work, msecs_to_jiffies(FREQ_QOS_REQ_MAX_MS));
-
-	return ret;
+	return set_cpu_max_freq(page, ret);
 }
 
 static int cpu_max_freq_show(struct seq_file *m, void *v)
 {
 	int cpu;
 
-	mutex_lock(&g_mutex);
 	for_each_present_cpu(cpu)
 		seq_printf(m, "%d:%u ", cpu, per_cpu(game_cpu_stats, cpu).max);
 	seq_printf(m, "\n");
-	mutex_unlock(&g_mutex);
 
 	return 0;
 }
@@ -338,50 +281,6 @@ static const struct proc_ops cpu_max_freq_proc_ops = {
 	.proc_read		= seq_read,
 	.proc_lseek		= seq_lseek,
 	.proc_release	= single_release,
-};
-
-static ssize_t disable_cpufreq_limit_proc_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
-{
-	char page[32] = {0};
-	int ret;
-	int disable;
-
-	ret = simple_write_to_buffer(page, sizeof(page) - 1, ppos, buf, count);
-	if (ret <= 0)
-		return ret;
-
-	ret = sscanf(page, "%d", &disable);
-	if (ret != 1)
-		return -EINVAL;
-
-	if (disable != 0 && disable != 1)
-		return -EINVAL;
-
-	if (atomic_read(&disable_cpufreq_limit) == disable)
-		return count;
-
-	atomic_set(&disable_cpufreq_limit, disable);
-
-	cancel_delayed_work_sync(&freq_qos_req_reset_work);
-	__freq_qos_request_reset();
-
-	return count;
-}
-
-static ssize_t disable_cpufreq_limit_proc_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
-{
-	char page[32] = {0};
-	int disable, len;
-
-	disable = atomic_read(&disable_cpufreq_limit);
-	len = sprintf(page, "%d\n", disable);
-
-	return simple_read_from_buffer(buf, count, ppos, page, len);
-}
-
-static const struct proc_ops disable_cpufreq_limit_proc_ops = {
-	.proc_write		= disable_cpufreq_limit_proc_write,
-	.proc_read		= disable_cpufreq_limit_proc_read,
 };
 
 int cpufreq_limits_init()
@@ -406,11 +305,8 @@ int cpufreq_limits_init()
 		return ret;
 	}
 
-	INIT_DELAYED_WORK(&freq_qos_req_reset_work, freq_qos_request_reset);
-
 	proc_create_data("cpu_min_freq", 0664, game_opt_dir, &cpu_min_freq_proc_ops, NULL);
 	proc_create_data("cpu_max_freq", 0664, game_opt_dir, &cpu_max_freq_proc_ops, NULL);
-	proc_create_data("disable_cpufreq_limit", 0664, game_opt_dir, &disable_cpufreq_limit_proc_ops, NULL);
 
 	return 0;
 }

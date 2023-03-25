@@ -364,27 +364,11 @@ static void lcdinfo_callback(enum panel_event_notifier_tag panel_tag,
 
 	switch (notification->notif_type) {
 	case DRM_PANEL_EVENT_BACKLIGHT:
-		if (g_ssc_cxt->need_lb_algo) {
-			ssc_interactive_set_brightness(panel_tag, notification->notif_data.data);
-		}
+		ssc_interactive_set_brightness(panel_tag, notification->notif_data.data);
 		break;
 	case DRM_PANEL_EVENT_DC_MODE:
-		if (g_ssc_cxt->need_lb_algo) {
-			ssc_interactive_set_dc_mode(notification->notif_data.data);
-		}
+		ssc_interactive_set_dc_mode(notification->notif_data.data);
 		break;
-#if IS_ENABLED(CONFIG_OPLUS_SENSOR_FB_QC)
-	case DRM_PANEL_EVENT_UNBLANK:
-		if (g_ssc_cxt->sup_power_fb) {
-			ssc_fb_set_screen_status(SCREEN_ON);
-		}
-		break;
-	case DRM_PANEL_EVENT_BLANK:
-		if (g_ssc_cxt->sup_power_fb) {
-			ssc_fb_set_screen_status(SCREEN_OFF);
-		}
-		break;
-#endif
 	default:
 		break;
 	}
@@ -629,14 +613,6 @@ static int __init ssc_interactive_init(void)
 			ssc_cxt->is_fold_dev = false;
 		}
 
-		if (of_property_read_bool(node, "sup-power-fb")) {
-			ssc_cxt->sup_power_fb = true;
-			pr_err("sup power_fb!");
-		} else {
-			ssc_cxt->sup_power_fb = false;
-			pr_err("not sup power_fb!");
-		}
-
 		err = of_property_read_u32(node, "need_lb_algo", &lb_value);
 		if (!err && lb_value) {
 			ssc_cxt->need_lb_algo = true;
@@ -690,7 +666,7 @@ static int __init ssc_interactive_init(void)
 		goto register_mdevice_failed;
 	}
 
-	if (ssc_cxt->need_lb_algo || ssc_cxt->sup_power_fb) {
+	if (ssc_cxt->need_lb_algo) {
 #if IS_ENABLED(CONFIG_OPLUS_SENSOR_DRM_PANEL_NOTIFY)
 		ssc_cxt->notify_work_retry = 10;
 		ssc_cxt->notify_work_regiseted = false;

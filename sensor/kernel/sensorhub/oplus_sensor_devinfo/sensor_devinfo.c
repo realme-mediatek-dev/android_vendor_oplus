@@ -86,7 +86,6 @@ enum {
 	GOLD_CCT_6K,
 	GOLD_CCT_FACTOR,
 	CCT_TYPE,
-	GYRO_CALI_RANGE,
 };
 
 #define ID_REAR_ALS     97
@@ -110,7 +109,6 @@ static int cct_type = CCT_NORMAL;
 static int g_reg_address = 0;
 static int g_reg_value = 0;
 static char acc_cali_range[16] = {0};
-static int gyro_cali_range = 200;
 static char gold_rear_cct_3k[35] = {0};
 static char gold_rear_cct_6k[35] = {0};
 static char gold_rear_cct_factor[35] = {0};
@@ -270,12 +268,6 @@ static void get_accgyro_cali_version(void)
 		gyro_cali_version = 1;
 	}
 	DEVINFO_LOG("gyro_cali_version = %d", gyro_cali_version);
-
-	ret = oplus_get_dts_feature(parent_node, "gsensor", "gyro_cali_range", &gyro_cali_range);
-	if (ret < 0) {
-		gyro_cali_range = 200;
-	}
-	DEVINFO_LOG("gyro range  [%d]", gyro_cali_range);
 
 	ret = oplus_get_dts_feature(parent_node, "gsensor", "acc_cali_range", acc_thrd);
 	if (ret < 0) {
@@ -792,9 +784,6 @@ static int sensor_feature_read_func(struct seq_file *s, void *v)
 	case CCT_TYPE:
 		seq_printf(s, "%d", cct_type);
 		break;
-	case GYRO_CALI_RANGE:
-		seq_printf(s, "%d", gyro_cali_range);
-		break;
 	default:
 		seq_printf(s, "not support chendai\n");
 	}
@@ -931,7 +920,6 @@ static struct proc_node sensor_feature_file[] = {
 	{"gold_als_factor", GOLD_ALS_FACTOR},
 	{"gold_rear_als_factor", GOLD_REAR_ALS_FACTOR},
 	{"gold_rear_cct_factor", GOLD_REAR_CCT_FACTOR},
-	{"gyro_cali_range", GYRO_CALI_RANGE},
 };
 
 static int oplus_sensor_feature_init()

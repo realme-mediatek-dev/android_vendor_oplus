@@ -25,7 +25,6 @@
 #define STATIC_FRAME_TASK    (1 << 0)
 #define BINDER_FRAME_TASK    (1 << 1)
 #define FRAME_COMPOSITION    (1 << 2)
-#define FRAME_GAME           (1 << 3)
 
 #define DEFAULT_BINDER_DEPTH (2)
 #define MAX_BINDER_THREADS   (6)
@@ -50,16 +49,6 @@ struct frame_group {
 	u64 curr_window_exec;
 	u64 prev_window_scale;
 	u64 prev_window_exec;
-
-	unsigned int window_busy;
-
-	/* nr_running:
-	 *     The number of running threads in the group
-	 * mark_start:
-	 *     Mark the start time of next load track
-	 */
-	int nr_running;
-	u64 mark_start;
 
 	unsigned int frame_zone;
 
@@ -91,12 +80,7 @@ static struct frame_group default_frame_boost_group;
 static DEFINE_RAW_SPINLOCK(sf_fbg_lock);
 static struct frame_group sf_composition_group;
 
-static DEFINE_RAW_SPINLOCK(game_fbg_lock);
-static struct frame_group game_frame_boost_group;
-
 static DEFINE_RAW_SPINLOCK(freq_protect_lock);
-
-static atomic_t fbg_initialized = ATOMIC_INIT(0);
 
 __read_mostly int num_sched_clusters;
 
@@ -244,47 +228,15 @@ static bool build_clusters(void)
 	return true;
 }
 
-/* We use these flag(FRAME_COMPOSITION, FRAME_GAME) to check which group @task is in
+/* We use this flag(FRAME_COMPOSITION) to check if @task is in sf_composition_group
  * instead of traversing the whole group list
  */
-static inline struct frame_group *task_get_frame_group(struct oplus_task_struct *ots)
+static inline bool is_composition_part(struct task_struct *task)
 {
-	if (ots->fbg_state & FRAME_COMPOSITION)
-		return &sf_composition_group;
-	else if (ots->fbg_state & FRAME_GAME)
-		return &game_frame_boost_group;
-	else
-		return &default_frame_boost_group;
-}
+	struct oplus_task_struct *ots = NULL;
 
-static inline raw_spinlock_t *task_get_frame_group_lock(struct oplus_task_struct *ots)
-{
-	if (ots->fbg_state & FRAME_COMPOSITION)
-		return &sf_fbg_lock;
-	else if (ots->fbg_state & FRAME_GAME)
-		return &game_fbg_lock;
-	else
-		return &def_fbg_lock;
-}
-
-static inline int get_frame_group_id(struct frame_group *grp)
-{
-	if (grp == &sf_composition_group)
-		return SF_FRAME_GROUP_ID;
-	else if (grp == &game_frame_boost_group)
-		return GAME_FRAME_GROUP_ID;
-	else /* grp == &default_frame_boost_group */
-		return DEFAULT_FRAME_GROUP_ID;
-}
-
-static inline void frame_grp_with_lock_assert(struct frame_group *grp)
-{
-	if (grp == &sf_composition_group)
-		lockdep_assert_held(&sf_fbg_lock);
-	else if (grp == &game_frame_boost_group)
-		lockdep_assert_held(&game_fbg_lock);
-	else /* grp == &default_frame_boost_group */
-		lockdep_assert_held(&def_fbg_lock);
+	ots = get_oplus_task_struct(task);
+	return ots->fbg_state & FRAME_COMPOSITION;
 }
 
 static inline bool __frame_boost_enabled(void)
@@ -340,13 +292,24 @@ static struct syscore_ops fbg_syscore_ops = {
 /***************************************************
  * add/remove static frame task to/from frame group
  ***************************************************/
+static inline void frame_grp_with_lock_assert(struct frame_group **grp, bool composition)
+{
+	if (*grp == NULL)
+		*grp = composition ? &sf_composition_group : &default_frame_boost_group;
+
+	if (*grp == &default_frame_boost_group) {
+		lockdep_assert_held(&def_fbg_lock);
+	} else if (*grp == &sf_composition_group) {
+		lockdep_assert_held(&sf_fbg_lock);
+	}
+}
+
 static void remove_task_from_frame_group(struct task_struct *tsk)
 {
 	struct oplus_task_struct *ots = get_oplus_task_struct(tsk);
 	struct frame_group *grp = NULL;
 
-	grp = task_get_frame_group(ots);
-	frame_grp_with_lock_assert(grp);
+	frame_grp_with_lock_assert(&grp, is_composition_part(tsk));
 
 	if (ots->fbg_state & STATIC_FRAME_TASK) {
 		list_del_init(&ots->fbg_list);
@@ -361,13 +324,6 @@ static void remove_task_from_frame_group(struct task_struct *tsk)
 			grp->render_pid = 0;
 		}
 
-		if (ots->fbg_running) {
-			ots->fbg_running = false;
-			grp->nr_running--;
-			if (unlikely(grp->nr_running < 0))
-				grp->nr_running = 0;
-		}
-
 		put_task_struct(tsk);
 	}
 
@@ -376,7 +332,6 @@ static void remove_task_from_frame_group(struct task_struct *tsk)
 		grp->available_cluster = NULL;
 		grp->policy_util = 0;
 		grp->curr_util = 0;
-		grp->nr_running = 0;
 	}
 }
 
@@ -402,13 +357,6 @@ static void clear_all_static_frame_task(struct frame_group *grp)
 				grp->render_pid = 0;
 			}
 
-			if (ots->fbg_running) {
-				ots->fbg_running = false;
-				grp->nr_running--;
-				if (unlikely(grp->nr_running < 0))
-					grp->nr_running = 0;
-			}
-
 			put_task_struct(p);
 		}
 	}
@@ -418,7 +366,6 @@ static void clear_all_static_frame_task(struct frame_group *grp)
 		grp->available_cluster = NULL;
 		grp->policy_util = 0;
 		grp->curr_util = 0;
-		grp->nr_running = 0;
 	}
 }
 
@@ -434,8 +381,6 @@ static void add_task_to_frame_group(struct frame_group *grp, struct task_struct 
 
 	if (grp == &sf_composition_group)
 		ots->fbg_state |= FRAME_COMPOSITION;
-	else if (grp == &game_frame_boost_group)
-		ots->fbg_state |= FRAME_GAME;
 
 	/* Static frame task's depth is zero */
 	ots->fbg_depth = 0;
@@ -599,36 +544,6 @@ out:
 	return success;
 }
 
-bool add_task_to_game_frame_group(int tid, int add)
-{
-	unsigned long flags;
-	struct task_struct *tsk = NULL;
-	struct frame_group *grp = NULL;
-	bool success = false;
-
-	rcu_read_lock();
-	tsk = find_task_by_vpid(tid);
-	rcu_read_unlock();
-
-	/* game_frame_boost_group not add binder task */
-	if (!tsk || strstr(tsk->comm, "binder:") || strstr(tsk->comm, "HwBinder:"))
-		goto out;
-
-	grp = &game_frame_boost_group;
-	raw_spin_lock_irqsave(&game_fbg_lock, flags);
-	if (add) {
-		get_task_struct(tsk);
-		add_task_to_frame_group(grp, tsk);
-	} else if (!add) {
-		remove_task_from_frame_group(tsk);
-	}
-	raw_spin_unlock_irqrestore(&game_fbg_lock, flags);
-
-	success = true;
-out:
-	return success;
-}
-
 /**********************************************************
  * add/remove dynamic binder frame task to/from frame group
  **********************************************************/
@@ -640,8 +555,7 @@ static void remove_binder_from_frame_group(struct task_struct *binder)
 	if (!(ots_binder->fbg_state & BINDER_FRAME_TASK))
 		return;
 
-	grp = task_get_frame_group(ots_binder);
-	frame_grp_with_lock_assert(grp);
+	frame_grp_with_lock_assert(&grp, is_composition_part(binder));
 
 	list_del_init(&ots_binder->fbg_list);
 	ots_binder->fbg_state = NONE_FRAME_TASK;
@@ -649,8 +563,8 @@ static void remove_binder_from_frame_group(struct task_struct *binder)
 	grp->binder_thread_num--;
 
 	if (grp->binder_thread_num < 0)
-		ofb_err("group binder num is less than 0, binder_num=%d, group_id=%d, prio=%d",
-			grp->binder_thread_num, get_frame_group_id(grp), binder->prio);
+		ofb_err("group binder num is less than 0, binder_num=%d, from_compostion=%s, prio=%d",
+			grp->binder_thread_num, is_composition_part(binder), binder->prio);
 
 	put_task_struct(binder);
 }
@@ -668,12 +582,8 @@ static void add_binder_to_frame_group(struct task_struct *binder, struct task_st
 	ots_binder = get_oplus_task_struct(binder);
 	ots_from = get_oplus_task_struct(from);
 
-	/* game_frame_boost_group not add binder task */
-	if (ots_from->fbg_state & FRAME_GAME)
-		return;
-
-	if (ots_from->fbg_state & FRAME_COMPOSITION) {
-		composition_part = true;
+	composition_part = is_composition_part(from);
+	if (composition_part) {
 		grp = &sf_composition_group;
 		raw_spin_lock_irqsave(&sf_fbg_lock, flags);
 	} else {
@@ -745,11 +655,14 @@ static void fbg_binder_wakeup_hook(void *unused, struct task_struct *caller_task
 static void fbg_binder_restore_priority_hook(void *unused, struct binder_transaction *t,
 	struct task_struct *task)
 {
-	struct oplus_task_struct *ots = get_oplus_task_struct(task);
 	unsigned long flags;
 	raw_spinlock_t *lock = NULL;
 
-	lock = task_get_frame_group_lock(ots);
+	if (is_composition_part(task)) {
+		lock = &sf_fbg_lock;
+	} else {
+		lock = &def_fbg_lock;
+	}
 
 	if (task != NULL) {
 		raw_spin_lock_irqsave(lock, flags);
@@ -768,12 +681,15 @@ static void fbg_binder_restore_priority_hook(void *unused, struct binder_transac
 static void fbg_binder_wait_for_work_hook(void *unused, bool do_proc_work,
 	struct binder_thread *tsk, struct binder_proc *proc)
 {
-	struct oplus_task_struct *ots = get_oplus_task_struct(tsk->task);
 	unsigned long flags;
 	raw_spinlock_t *lock = NULL;
 
 	if (do_proc_work) {
-		lock = task_get_frame_group_lock(ots);
+		if (is_composition_part(tsk->task)) {
+			lock = &sf_fbg_lock;
+		} else {
+			lock = &def_fbg_lock;
+		}
 
 		raw_spin_lock_irqsave(lock, flags);
 		remove_binder_from_frame_group(tsk->task);
@@ -818,11 +734,6 @@ void set_frame_group_window_size(unsigned int window_size)
 	raw_spin_lock_irqsave(&sf_fbg_lock, flags);
 	grp->window_size = window_size;
 	raw_spin_unlock_irqrestore(&sf_fbg_lock, flags);
-
-	grp = &game_frame_boost_group;
-	raw_spin_lock_irqsave(&game_fbg_lock, flags);
-	grp->window_size = window_size;
-	raw_spin_unlock_irqrestore(&game_fbg_lock, flags);
 }
 
 #define DIV64_U64_ROUNDUP(X, Y) div64_u64((X) + (Y - 1), Y)
@@ -851,102 +762,88 @@ static inline u64 scale_exec_time(u64 delta, struct rq *rq)
 	return (delta * task_exec_scale) >> 10;
 }
 
-static s64 update_window_start(u64 wallclock, struct frame_group *grp, int group_id)
+static s64 update_window_start(u64 wallclock, bool composition)
 {
 	s64 delta;
+	struct frame_group *grp = NULL;
 
-	frame_grp_with_lock_assert(grp);
+	frame_grp_with_lock_assert(&grp, composition);
 
 	delta = wallclock - grp->window_start;
 
-	if (delta <= 0) {
-		ofb_debug("wallclock=%llu is lesser than window_start=%llu, group_id=%d",
-			wallclock, grp->window_start, group_id);
+	if (delta < 0) {
+		ofb_debug("wallclock=%llu is lesser than window_start=%llu, composition=%d",
+			wallclock, grp->window_start, composition);
 		return delta;
 	}
 
 	grp->window_start = wallclock;
 	grp->prev_window_size = grp->window_size;
-	grp->window_busy = (grp->curr_window_exec * 100) / delta;
 
 	if (unlikely(sysctl_frame_boost_debug)) {
 		static unsigned long main_count, sf_count;
 		unsigned long *count;
-		char *msg;
 
-		trace_printk("window_start=%llu window_size=%llu delta=%lld group_id=%d\n",
-			grp->window_start, grp->window_size, delta, group_id);
-
-		if (group_id == SF_FRAME_GROUP_ID) {
+		if (composition)
 			count = &sf_count;
-			msg = "sf";
-		} else if (group_id == DEFAULT_FRAME_GROUP_ID) {
+		else
 			count = &main_count;
-			msg = "main";
-		} else {
-			return delta;
-		}
-
 		*count += 1;
-		val_systrace_c((*count)%2, msg);
+
+		val_systrace_c((*count)%2, composition ? "sf" : "main");
+		trace_printk("window_start=%llu window_size=%llu delta=%lld composition=%d\n",
+			grp->window_start, grp->window_size, delta, composition);
 	}
 
 	return delta;
 }
 
-static void update_group_exectime(struct frame_group *grp, int group_id)
+static void update_group_exectime(bool composition)
 {
-	frame_grp_with_lock_assert(grp);
+	struct frame_group *grp = NULL;
+
+	frame_grp_with_lock_assert(&grp, composition);
 
 	grp->prev_window_scale = grp->curr_window_scale;
 	grp->curr_window_scale = 0;
 	grp->prev_window_exec = grp->curr_window_exec;
 	grp->curr_window_exec = 0;
 
-	if (unlikely(sysctl_frame_boost_debug) && (group_id == DEFAULT_FRAME_GROUP_ID)) {
+	if (unlikely(sysctl_frame_boost_debug) && !composition) {
 		val_systrace_c(grp->prev_window_exec, "prev_window_exec");
 		val_systrace_c(get_frame_putil(grp->prev_window_scale, grp->frame_zone),
-			"prev_window_util");
+			"prev_window_scale");
 		val_systrace_c(grp->curr_window_exec, "curr_window_exec");
 		val_systrace_c(get_frame_putil(grp->curr_window_scale, grp->frame_zone),
-			"curr_window_util");
+			"curr_window_scale");
 	}
 }
 
-static void update_util_before_window_rollover(int group_id);
-int rollover_frame_group_window(int group_id)
+int rollover_frame_group_window(bool composition)
 {
 	u64 wallclock;
 	unsigned long flags;
 	raw_spinlock_t *lock = NULL;
-	struct frame_group *grp;
 
-	update_util_before_window_rollover(group_id);
-
-	if (group_id == SF_FRAME_GROUP_ID) {
-		grp = &sf_composition_group;
+	if (composition) {
 		lock = &sf_fbg_lock;
-	} else if (group_id == GAME_FRAME_GROUP_ID) {
-		grp = &game_frame_boost_group;
-		lock = &game_fbg_lock;
-	} else { /* DEFAULT_FRAME_GROUP_ID */
-		grp = &default_frame_boost_group;
+	} else {
 		lock = &def_fbg_lock;
 	}
 
 	raw_spin_lock_irqsave(lock, flags);
 
 	wallclock = fbg_ktime_get_ns();
-	update_window_start(wallclock, grp, group_id);
+	update_window_start(wallclock, composition);
 
-	if (unlikely(sysctl_frame_boost_debug) && (group_id == DEFAULT_FRAME_GROUP_ID))
+	if (unlikely(sysctl_frame_boost_debug))
 		val_systrace_c(get_frame_rate(), "framerate");
 
 	/* We set curr_window_* as prev_window_* and clear curr_window_*,
 	 * but prev_window_* now may belong to old_frame_app, and curr_window_*
 	 * belong to new_frame_app, when called from ioctl(BOOST_MOVE_FG).
 	 */
-	update_group_exectime(grp, group_id);
+	update_group_exectime(composition);
 
 	raw_spin_unlock_irqrestore(lock, flags);
 
@@ -1087,7 +984,7 @@ static unsigned long update_freq_policy_util(struct frame_group *grp, u64 wallcl
 	bool use_vutil = true;
 	u64 check_timeline = 0;
 
-	frame_grp_with_lock_assert(grp);
+	frame_grp_with_lock_assert(&grp, false);
 	update_frame_zone(grp, wallclock);
 
 	if (!grp->frame_zone)
@@ -1150,20 +1047,6 @@ static unsigned long update_freq_policy_util(struct frame_group *grp, u64 wallcl
 	return frame_uclamp(frame_util);
 }
 
-void fbg_get_frame_scale(unsigned long *frame_scale)
-{
-	struct frame_group *grp = &game_frame_boost_group;
-
-	*frame_scale = grp->prev_window_scale;
-}
-
-void fbg_get_frame_busy(unsigned int *frame_busy)
-{
-	struct frame_group *grp = &game_frame_boost_group;
-
-	*frame_busy = grp->window_busy;
-}
-
 bool check_putil_over_thresh(unsigned long thresh)
 {
 	struct frame_group *grp = &default_frame_boost_group;
@@ -1185,7 +1068,7 @@ static bool valid_freq_querys(const struct cpumask *query_cpus, struct frame_gro
 	u64 now = fbg_ktime_get_ns();
 	int cpu;
 
-	frame_grp_with_lock_assert(grp);
+	frame_grp_with_lock_assert(&grp, false);
 
 	if (list_empty(&grp->tasks))
 		return false;
@@ -1424,16 +1307,15 @@ unlock:
  *       the other paramenter is unused
  */
 static void update_frame_group_util(struct task_struct *p, u64 running,
-	u64 wallclock, bool default_part, struct frame_group *grp)
+	u64 wallclock, bool composition)
 {
-	struct oplus_task_struct *ots = get_oplus_task_struct(p);
-	u64 adjusted_running;
 	u64 window_start;
 	u64 delta_wc_ws;
 	u64 prev_exec, exec_scale;
 	struct rq *rq = task_rq(p);
+	struct frame_group *grp = NULL;
 
-	frame_grp_with_lock_assert(grp);
+	frame_grp_with_lock_assert(&grp, composition);
 
 	window_start = grp->window_start;
 	if (unlikely(wallclock < window_start)) {
@@ -1445,45 +1327,16 @@ static void update_frame_group_util(struct task_struct *p, u64 running,
 
 	delta_wc_ws = wallclock - window_start;
 
-	/*
-	 * adjust the running time, for serial load track.
-	 * only adjust STATIC_FRAME_TASK tasks, not BINDER_FRAME_TASK tasks,
-	 * matched with the logic of update_group_nr_running().
-	 */
-	if (ots->fbg_state & STATIC_FRAME_TASK) {
-		if (grp->mark_start <= 0)
-			return;
-
-		adjusted_running = wallclock - grp->mark_start;
-		if (unlikely(adjusted_running <= 0)) {
-			ofb_debug("adjusted_running <= 0 with wc=%llu ms=%llu\n",
-				wallclock, grp->mark_start);
-			return;
-		}
-
-		if (unlikely(sysctl_frame_boost_debug)) {
-			trace_printk("raw_running=%llu, adjusted_running=%llu,"
-				" old_mark_start=%llu, new_mark_start=%llu\n",
-				running, adjusted_running, grp->mark_start, wallclock);
-		}
-
-		grp->mark_start = wallclock;
-		running = adjusted_running;
-	}
-
-	if (running <= 0)
-		return;
-
 	/* Per group load tracking in FBG */
 	if (likely(delta_wc_ws >= running)) {
 		grp->curr_window_exec += running;
 
 		exec_scale = scale_exec_time(running, rq);
 		grp->curr_window_scale += exec_scale;
-		if (unlikely(sysctl_frame_boost_debug) && default_part) {
+		if (unlikely(sysctl_frame_boost_debug) && !composition) {
 			val_systrace_c(grp->curr_window_exec, "curr_window_exec");
 			val_systrace_c(get_frame_putil(grp->curr_window_scale, grp->frame_zone),
-				"curr_window_util");
+				"curr_window_scale");
 		}
 	} else {
 		/* Prev window group statistic */
@@ -1499,19 +1352,18 @@ static void update_frame_group_util(struct task_struct *p, u64 running,
 		exec_scale = scale_exec_time(delta_wc_ws, rq);
 		grp->curr_window_scale += exec_scale;
 
-		if (unlikely(sysctl_frame_boost_debug) && default_part) {
+		if (unlikely(sysctl_frame_boost_debug) && !composition) {
 			val_systrace_c(grp->prev_window_exec, "prev_window_exec");
-			val_systrace_c(get_frame_putil(grp->prev_window_scale, grp->frame_zone), "prev_window_util");
+			val_systrace_c(get_frame_putil(grp->prev_window_scale, grp->frame_zone), "prev_window_scale");
 			val_systrace_c(grp->curr_window_exec, "curr_window_exec");
-			val_systrace_c(get_frame_putil(grp->curr_window_scale, grp->frame_zone) , "curr_window_util");
+			val_systrace_c(get_frame_putil(grp->curr_window_scale, grp->frame_zone) , "curr_window_scale");
 		}
 	}
 
 	grp->last_util_update_time = wallclock;
 }
 
-static inline void fbg_update_task_util(struct task_struct *tsk, u64 runtime,
-	bool need_freq_update)
+static inline void fbg_update_task_util(struct task_struct *tsk, u64 runtime)
 {
 	struct frame_group *grp = NULL;
 	struct oplus_task_struct *ots = NULL;
@@ -1519,21 +1371,16 @@ static inline void fbg_update_task_util(struct task_struct *tsk, u64 runtime,
 	unsigned long flags;
 	u64 wallclock;
 	bool composition_part = false;
-	bool default_part = false;
 
 	ots = get_oplus_task_struct(tsk);
 	if (ots->fbg_state == NONE_FRAME_TASK)
 		return;
 
-	if (ots->fbg_state & FRAME_COMPOSITION) {
-		composition_part = true;
+	composition_part = is_composition_part(tsk);
+	if (composition_part) {
 		grp = &sf_composition_group;
 		lock = &sf_fbg_lock;
-	} else if (ots->fbg_state & FRAME_GAME) {
-		grp = &game_frame_boost_group;
-		lock = &game_fbg_lock;
 	} else {
-		default_part = true;
 		grp = &default_frame_boost_group;
 		lock = &def_fbg_lock;
 	}
@@ -1545,148 +1392,26 @@ static inline void fbg_update_task_util(struct task_struct *tsk, u64 runtime,
 	 * 3) try to update cpufreq.
 	 */
 	wallclock = fbg_ktime_get_ns();
-	update_frame_group_util(tsk, runtime, wallclock, default_part, grp);
+	update_frame_group_util(tsk, runtime, wallclock, composition_part);
 
 	raw_spin_unlock_irqrestore(lock, flags);
 
-	if (need_freq_update) {
-		if (composition_part)
-			sf_composition_update_cpufreq(tsk);
-		else if (default_part)
-			default_group_update_cpufreq();
+	if (composition_part) {
+		sf_composition_update_cpufreq(tsk);
+	} else {
+		default_group_update_cpufreq();
 	}
 }
 
 static void fbg_update_cfs_util_hook(void *unused, struct task_struct *tsk,
 	u64 runtime, u64 vruntime)
 {
-	fbg_update_task_util(tsk, runtime, true);
+	fbg_update_task_util(tsk, runtime);
 }
 
 static void fbg_update_rt_util_hook(void *unused, struct task_struct *tsk, u64 runtime)
 {
-	fbg_update_task_util(tsk, runtime, true);
-}
-
-enum task_event {
-	PUT_PREV_TASK	= 0,
-	PICK_NEXT_TASK	= 1,
-};
-
-/*
- * Update the number of running threads in the group.
- *
- * If thread belonging to a group start running, nr_running of group +1.
- * If thread belonging to a group stop running, nr_running of group -1.
- *
- * We only consider STATIC_FRAME_TASK tasks, not BINDER_FRAME_TASK tasks,
- * because same BINDER_FRAME_TASK tasks bouncing between different group.
- *
- * When nr_running form 0 to 1, the mark_start set to the current time.
- */
-static void update_group_nr_running(struct task_struct *p, int event)
-{
-	struct oplus_task_struct *ots = get_oplus_task_struct(p);
-	struct frame_group *grp = NULL;
-	raw_spinlock_t *lock = NULL;
-	int group_id;
-	unsigned long flags;
-
-	grp = task_get_frame_group(ots);
-	lock = task_get_frame_group_lock(ots);
-	group_id = get_frame_group_id(grp);
-
-	raw_spin_lock_irqsave(lock, flags);
-	if (event == PICK_NEXT_TASK && (ots->fbg_state & STATIC_FRAME_TASK)) {
-		ots->fbg_running = true;
-		grp->nr_running++;
-		if (grp->nr_running == 1)
-			grp->mark_start = max(grp->mark_start, fbg_ktime_get_ns());
-		if (unlikely(sysctl_frame_boost_debug)) {
-			trace_printk("group_id=%d, next->comm=%s, next->tid=%d, nr_running=%d, mark_start=%llu\n",
-				group_id, p->comm, p->pid, grp->nr_running, grp->mark_start);
-		}
-	} else if (event == PUT_PREV_TASK && ots->fbg_running) {
-		ots->fbg_running = false;
-		grp->nr_running--;
-		if (unlikely(grp->nr_running < 0))
-			grp->nr_running = 0;
-		if (unlikely(sysctl_frame_boost_debug)) {
-			trace_printk("group_id=%d, prev->comm=%s, prev->tid=%d, nr_running=%d\n",
-				group_id, p->comm, p->pid, grp->nr_running);
-		}
-	}
-	raw_spin_unlock_irqrestore(lock, flags);
-}
-
-void fbg_android_rvh_schedule_handler(struct task_struct *prev,
-	struct task_struct *next, struct rq *rq)
-{
-	if (atomic_read(&fbg_initialized) == 0)
-		return;
-
-	if (unlikely(prev == next))
-		return;
-
-	/* prev task */
-	update_group_nr_running(prev, PUT_PREV_TASK);
-	/* next task */
-	update_group_nr_running(next, PICK_NEXT_TASK);
-}
-EXPORT_SYMBOL_GPL(fbg_android_rvh_schedule_handler);
-
-void fbg_android_rvh_cpufreq_transition(struct cpufreq_policy *policy)
-{
-	struct task_struct *curr_task;
-	struct rq *rq;
-	int cpu;
-
-	if (atomic_read(&fbg_initialized) == 0)
-		return;
-
-	for_each_cpu(cpu, policy->cpus) {
-		rq = cpu_rq(cpu);
-
-		rcu_read_lock();
-		curr_task = rcu_dereference(rq->curr);
-		if (curr_task)
-			get_task_struct(curr_task);
-		rcu_read_unlock();
-
-		if (curr_task) {
-			fbg_update_task_util(curr_task, 0, false);
-			put_task_struct(curr_task);
-		}
-	}
-}
-EXPORT_SYMBOL_GPL(fbg_android_rvh_cpufreq_transition);
-
-static void update_util_before_window_rollover(int group_id)
-{
-	struct oplus_sched_cluster *cluster;
-	struct task_struct *curr_task;
-	struct rq *rq;
-	int cpu;
-
-	if (group_id != GAME_FRAME_GROUP_ID)
-		return;
-
-	for_each_sched_cluster(cluster) {
-		for_each_cpu(cpu, &cluster->cpus) {
-			rq = cpu_rq(cpu);
-
-			rcu_read_lock();
-			curr_task = rcu_dereference(rq->curr);
-			if (curr_task)
-				get_task_struct(curr_task);
-			rcu_read_unlock();
-
-			if (curr_task) {
-				fbg_update_task_util(curr_task, 0, false);
-				put_task_struct(curr_task);
-			}
-		}
-	}
+	fbg_update_task_util(tsk, runtime);
 }
 
 /*********************************
@@ -1960,7 +1685,7 @@ bool fbg_need_up_migration(struct task_struct *p, struct rq *rq)
 		return false;
 
 	ots = get_oplus_task_struct(p);
-	if (!ots->fbg_state || ots->fbg_state & (FRAME_COMPOSITION | FRAME_GAME))
+	if (!ots->fbg_state || ots->fbg_state & FRAME_COMPOSITION)
 		return false;
 
 	grp = &default_frame_boost_group;
@@ -1991,7 +1716,7 @@ bool fbg_skip_migration(struct task_struct *tsk, int src_cpu, int dst_cpu)
 		return false;
 
 	ots = get_oplus_task_struct(tsk);
-	if (!ots->fbg_state || ots->fbg_state & (FRAME_COMPOSITION | FRAME_GAME))
+	if (!ots->fbg_state || ots->fbg_state & FRAME_COMPOSITION)
 		return false;
 
 	dst_ots = get_oplus_task_struct(dst_rq->curr);
@@ -2069,11 +1794,13 @@ EXPORT_SYMBOL_GPL(fbg_skip_rt_sync);
  *********************************/
 static void fbg_flush_task_hook(void *unused, struct task_struct *tsk)
 {
-	struct oplus_task_struct *ots = get_oplus_task_struct(tsk);
 	unsigned long flags;
 	raw_spinlock_t *lock = NULL;
 
-	lock = task_get_frame_group_lock(ots);
+	if (is_composition_part(tsk))
+		lock = &sf_fbg_lock;
+	else
+		lock = &def_fbg_lock;
 
 	raw_spin_lock_irqsave(lock, flags);
 	remove_task_from_frame_group(tsk);
@@ -2087,7 +1814,6 @@ static void fbg_sched_fork_hook(void *unused, struct task_struct *tsk)
 
 	ots->fbg_state = NONE_FRAME_TASK;
 	ots->fbg_depth = INVALID_FBG_DEPTH;
-	ots->fbg_running = false;
 	ots->preferred_cluster_id = -1;
 	INIT_LIST_HEAD(&ots->fbg_list);
 }
@@ -2148,16 +1874,6 @@ int info_show(struct seq_file *m, void *v)
 	}
 	raw_spin_unlock_irqrestore(&sf_fbg_lock, flags);
 
-	seq_puts(m, "\n---- GAME FRAME GROUP ----\n");
-	grp = &game_frame_boost_group;
-	raw_spin_lock_irqsave(&game_fbg_lock, flags);
-	list_for_each_entry(ots, &grp->tasks, fbg_list) {
-		tsk = ots_to_ts(ots);
-		seq_printf(m, "comm=%-16s  pid=%-6d  tgid=%-6d  state=%d  depth=%d\n",
-			tsk->comm, tsk->pid, tsk->tgid, ots->fbg_state, ots->fbg_depth);
-	}
-	raw_spin_unlock_irqrestore(&game_fbg_lock, flags);
-
 	return 0;
 }
 
@@ -2172,8 +1888,6 @@ int frame_group_init(void)
 	INIT_LIST_HEAD(&grp->tasks);
 	grp->window_size = NSEC_PER_SEC / DEFAULT_FRAME_RATE;
 	grp->window_start = 0;
-	grp->nr_running = 0;
-	grp->mark_start = 0;
 	grp->preferred_cluster = NULL;
 	grp->available_cluster = NULL;
 
@@ -2182,18 +1896,6 @@ int frame_group_init(void)
 	INIT_LIST_HEAD(&grp->tasks);
 	grp->window_size = NSEC_PER_SEC / DEFAULT_FRAME_RATE;
 	grp->window_start = 0;
-	grp->nr_running = 0;
-	grp->mark_start = 0;
-	grp->preferred_cluster = NULL;
-	grp->available_cluster = NULL;
-
-	/* Game frame group initialization */
-	grp = &game_frame_boost_group;
-	INIT_LIST_HEAD(&grp->tasks);
-	grp->window_size = NSEC_PER_SEC / DEFAULT_FRAME_RATE;
-	grp->window_start = 0;
-	grp->nr_running = 0;
-	grp->mark_start = 0;
 	grp->preferred_cluster = NULL;
 	grp->available_cluster = NULL;
 
@@ -2212,8 +1914,6 @@ int frame_group_init(void)
 			num_possible_cpus());
 
 	register_syscore_ops(&fbg_syscore_ops);
-
-	atomic_set(&fbg_initialized, 1);
 
 out:
 	return ret;

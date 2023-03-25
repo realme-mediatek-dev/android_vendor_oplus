@@ -11,7 +11,6 @@
 #include <linux/printk.h>      /* for pr_err, pr_info etc */
 #include <linux/mutex.h>
 #include <linux/fcntl.h>
-#include <linux/version.h>
 #include <linux/proc_fs.h>
 #include <linux/atomic.h>
 #include <../kernel/oplus_cpu/sched/sched_assist/sa_common.h>
@@ -27,12 +26,7 @@
 #define MAX_SYMBOL_LEN 64
 #define TASK_WHITE_LIST_MAX  128
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
 static char symbol[MAX_SYMBOL_LEN] = "__alloc_fd";
-#else
-static char symbol[MAX_SYMBOL_LEN] = "get_unused_fd_flags";
-#endif
-
 module_param_string(symbol, symbol, sizeof(symbol), 0644);
 int load_threshold = DEFAULT_THRESHOLD;
 int dump_threshold = DEFAULT_DUMP_THRESHOLD;
@@ -79,7 +73,7 @@ static ssize_t fdleak_proc_write(struct file *file, const char __user *buf,
 {
 	int tmp_load_threshold = 0;
 	int tmp_dump_threshold = 0;
-	char tmp_task[16] = {0};
+	char tmp_task[100] = {0};
 	int ret = 0;
 	char buffer[100] = {0};
 	int i;
@@ -152,34 +146,33 @@ int white_list_check(struct task_struct *p) {
         return -1;
 }
 
-static void fdleak_check(int fd)
+static void fdleak_check(struct task_struct *p, int fd)
 {
-	struct oplus_task_struct *ots = get_oplus_task_struct(current);
+	struct oplus_task_struct *ots = get_oplus_task_struct(p);
 
 	if (IS_ERR_OR_NULL(ots))
 		return;
 
-        if (current->sighand == NULL) {
+        if (p->sighand == NULL) {
 		return;
         }
 
-        if (current->sighand->action[SIG_FDLEAK_CHECK_TRIGGER - 1].sa.sa_handler == SIG_DFL) {
+        if (p->sighand->action[SIG_FDLEAK_CHECK_TRIGGER - 1].sa.sa_handler == SIG_DFL) {
 		return;
         }
 
 	/* already fdleak, return, not check */
-	if (ots->fdleak_flag == FDLEAK_ALREADY_DUMP_FLAG || current->pid != current->tgid) {
+	if (ots->fdleak_flag == FDLEAK_ALREADY_DUMP_FLAG || p->pid != p->tgid) {
 		return;
-	} else if (ots->fdleak_flag == FDLEAK_ALREADY_TRIGGER_FLAG && !white_list_check(current) && fd >= dump_threshold) {
-		send_sig(BIONIC_SIGNAL_FDTRACK, current, 0);
+	} else if (ots->fdleak_flag == FDLEAK_ALREADY_TRIGGER_FLAG && !white_list_check(p) && fd >= dump_threshold) {
+		send_sig(BIONIC_SIGNAL_FDTRACK, p, 0);
 		ots->fdleak_flag = FDLEAK_ALREADY_DUMP_FLAG;
-	} else if (ots->fdleak_flag != FDLEAK_ALREADY_TRIGGER_FLAG && !white_list_check(current) && fd >= load_threshold) {
+	} else if (ots->fdleak_flag != FDLEAK_ALREADY_TRIGGER_FLAG && !white_list_check(p) && fd >= load_threshold) {
 		if (atomic_cmpxchg(&error_is_handling, 0, 1) != 0)
 			return;
 
 		ots->fdleak_flag = FDLEAK_ALREADY_TRIGGER_FLAG;
-	    pr_err(FDLEAK_CHECK_LOG_TAG "current : %s fd: %d \n", current->comm, fd);
-		handle_fdleak_error(current);
+		handle_fdleak_error(p);
 	} else {
 		return;
         }
@@ -188,12 +181,13 @@ static void fdleak_check(int fd)
 static int ret_handler(struct kretprobe_instance *kri, struct pt_regs *regs)
 {
 	int fd;
+
 	fd = regs_return_value(regs);
 	if (fd < 0) {
 		return -1;
 	}
 
-	fdleak_check(fd);
+	fdleak_check(kri->task, fd);
 	return 0;
 }
 

@@ -20,6 +20,5 @@ enum {
 };
 
 extern void set_charger_ic(int sel);
-int oplus_get_subboard_temp(void);
-int qpnp_get_prop_charger_voltage_now(void);
+
 #endif

@@ -73,9 +73,7 @@ static uint32_t oem_sec_override1_reg = 0;
 static uint32_t oem_override1_en_value = 0;
 static uint32_t oem_cryptokey_unsupport = 0;
 #ifdef QCOM_PLATFORM
-#define SEC_VALUE_INVALID   -1
-static int g_rpmb_enabled = SEC_VALUE_INVALID;
-static int g_secure_type = SEC_VALUE_INVALID;
+static int g_rpmb_enabled = -1;
 #endif
 
 static int secure_common_parse_parent_dts(struct secure_data *secure_data)
@@ -173,120 +171,44 @@ static bool is_sboot_support(void)
 }
 #endif
 
-#ifdef QCOM_PLATFORM
-static void get_rpmb_enable_state_from_cmdline(char *bootargs)
-{
-    if (bootargs == NULL) {
-        pr_err("%s: bootargs is NULL!\n", __func__);
-        return;
-    }
-
-    if (strstr(bootargs, "oplusboot.rpmb_enabled=1")) {
-        pr_err("%s: success to get oplusboot.rpmb_enabled=1 in bootargs!\n", __func__);
-        g_rpmb_enabled = 1;
-    } else if (strstr(bootargs, "oplusboot.rpmb_enabled=0")) {
-        pr_err("%s: success to get oplusboot.rpmb_enabled=0 in bootargs!\n", __func__);
-        g_rpmb_enabled = 0;
-    } else {
-        pr_err("%s: fail to get oplusboot.rpmb_enabled in bootargs!\n", __func__);
-    }
-}
-
-static void get_secure_type_from_cmdline(char *bootargs)
-{
-    char *str = NULL;
-    int secure_type = -1;
-
-    if (bootargs == NULL) {
-        pr_err("%s: bootargs is NULL!\n", __func__);
-        return;
-    }
-
-    str = strstr(bootargs, "oplusboot.secure_type=");
-    if (str) {
-        str += strlen("oplusboot.secure_type=");
-        get_option(&str, &secure_type);
-        if (secure_type >= SECURE_BOOT_OFF && secure_type <= SECURE_BOOT_UNKNOWN) {
-            g_secure_type = secure_type;
-        }
-        pr_err("%s: oplusboot.secure_type= %d\n", __func__, secure_type);
-    } else {
-        pr_err("%s: fail to get oplusboot.secure_type in bootargs!\n", __func__);
-    }
-}
-
-static void oplus_secure_parse_cmdline(void)
-{
-    struct device_node * of_chosen = NULL;
-    char *bootargs = NULL;
-
-    of_chosen = of_find_node_by_path("/chosen");
-    if (of_chosen) {
-        bootargs = (char *)of_get_property(of_chosen, "bootargs", NULL);
-        if (!bootargs) {
-            pr_err("%s: failed to get bootargs\n", __func__);
-            return;
-        }
-    } else {
-        pr_err("%s: failed to get /chosen \n", __func__);
-        return;
-    }
-
-    // get rpmb enable state from cmdline
-    get_rpmb_enable_state_from_cmdline(bootargs);
-
-    // get secure type from cmdline
-    get_secure_type_from_cmdline(bootargs);
-}
-#endif
-
 secure_type_t get_secureType(void)
 {
         secure_type_t secureType = SECURE_BOOT_UNKNOWN;
         #if defined(MTK_PLATFORM)
         secureType = is_sboot_support() ? SECURE_BOOT_ON : SECURE_BOOT_OFF;
         #else
-        #ifdef QCOM_PLATFORM
-        if (g_secure_type != SEC_VALUE_INVALID) {
-            pr_err("%s: g_secure_type %d\n", __func__, g_secure_type);
-            secureType = (secure_type_t)g_secure_type;
-        } else {
-        #endif /* QCOM_PLATFORM */
-            void __iomem *oem_config_base;
-            uint32_t secure_oem_config1 = 0;
-            uint32_t secure_oem_config2 = 0;
-            oem_config_base = ioremap(oem_sec_reg_num, 4);
-            secure_oem_config1 = __raw_readl(oem_config_base);
-            iounmap(oem_config_base);
-            pr_err("secure_oem_config1 0x%x\n", secure_oem_config1);
+        void __iomem *oem_config_base;
+        uint32_t secure_oem_config1 = 0;
+        uint32_t secure_oem_config2 = 0;
+        oem_config_base = ioremap(oem_sec_reg_num, 4);
+        secure_oem_config1 = __raw_readl(oem_config_base);
+        iounmap(oem_config_base);
+        pr_err("secure_oem_config1 0x%x\n", secure_oem_config1);
 
-            oem_config_base = ioremap(oem_sec_en_anti_reg, 4);
-            secure_oem_config2 = __raw_readl(oem_config_base);
-            iounmap(oem_config_base);
-            #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-            secure_oem_config2 = secure_oem_config2 >> 16;
-            secure_oem_config2 = secure_oem_config2 & 0x0003;
-            pr_err("secure_oem_config2 0x%x\n", secure_oem_config2);
-            if (secure_oem_config1 == 0) {
-                    secureType = SECURE_BOOT_OFF;
-            } else if (secure_oem_config2 == 0x0001) {
-                    secureType = SECURE_BOOT_ON_STAGE_1;
-            } else {
-                    secureType = SECURE_BOOT_ON_STAGE_2;
-            }
-            #else
-            pr_err("secure_oem_config2 0x%x\n", secure_oem_config2);
-            if (secure_oem_config1 == 0) {
-                    secureType = SECURE_BOOT_OFF;
-            } else if (secure_oem_config2 == 0) {
-                    secureType = SECURE_BOOT_ON_STAGE_1;
-            } else {
-                    secureType = SECURE_BOOT_ON_STAGE_2;
-            }
-            #endif
-        #ifdef QCOM_PLATFORM
+        oem_config_base = ioremap(oem_sec_en_anti_reg, 4);
+        secure_oem_config2 = __raw_readl(oem_config_base);
+        iounmap(oem_config_base);
+        #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+        secure_oem_config2 = secure_oem_config2 >> 16;
+        secure_oem_config2 = secure_oem_config2 & 0x0003;
+        pr_err("secure_oem_config2 0x%x\n", secure_oem_config2);
+        if (secure_oem_config1 == 0) {
+                secureType = SECURE_BOOT_OFF;
+        } else if (secure_oem_config2 == 0x0001) {
+                secureType = SECURE_BOOT_ON_STAGE_1;
+        } else {
+                secureType = SECURE_BOOT_ON_STAGE_2;
         }
-        #endif /* QCOM_PLATFORM */
+        #else
+        pr_err("secure_oem_config2 0x%x\n", secure_oem_config2);
+        if (secure_oem_config1 == 0) {
+                secureType = SECURE_BOOT_OFF;
+        } else if (secure_oem_config2 == 0) {
+                secureType = SECURE_BOOT_ON_STAGE_1;
+        } else {
+                secureType = SECURE_BOOT_ON_STAGE_2;
+        }
+        #endif
         #endif
         return secureType;
 }
@@ -468,6 +390,37 @@ static struct file_operations oemLogEncrypt_proc_fops = {
 #endif //QCOM_QSEELOG_ENCRYPT
 
 #ifdef QCOM_PLATFORM
+static int is_rpmb_enabled(void)
+{
+    struct device_node * of_chosen = NULL;
+    char *bootargs = NULL;
+    int ret = -1;
+
+    of_chosen = of_find_node_by_path("/chosen");
+    if (of_chosen) {
+        bootargs = (char *)of_get_property(of_chosen, "bootargs", NULL);
+        if (!bootargs) {
+            pr_err("%s: failed to get bootargs\n", __func__);
+            return ret;
+        }
+    } else {
+        pr_err("%s: failed to get /chosen \n", __func__);
+        return ret;
+    }
+
+    if (strstr(bootargs, "oplusboot.rpmb_enabled=1")) {
+        pr_err("%s: success to get oplusboot.rpmb_enabled=1 in bootargs!\n", __func__);
+        ret = 1;
+    } else if (strstr(bootargs, "oplusboot.rpmb_enabled=0")) {
+        pr_err("%s: success to get oplusboot.rpmb_enabled=0 in bootargs!\n", __func__);
+        ret = 0;
+    } else {
+        pr_err("%s: fail to get oplusboot.rpmb_enabled in bootargs!\n", __func__);
+    }
+
+    return ret;
+}
+
 static ssize_t rpmbEnableStatus_read_proc(struct file *file, char __user *buf,
                 size_t count, loff_t *off)
 {
@@ -542,8 +495,9 @@ static int secure_register_proc_fs(struct secure_data *secure_data)
 #endif //QCOM_QSEELOG_ENCRYPT
 
 #ifdef QCOM_PLATFORM
+        g_rpmb_enabled = is_rpmb_enabled();
         /* Do not create the node when the cmdline value cannot be read */
-        if (g_rpmb_enabled != SEC_VALUE_INVALID) {
+        if (g_rpmb_enabled != -1) {
             /*  make the proc /proc/oplus_secure_common/rpmbEnableStatus  */
             pentry = proc_create("rpmbEnableStatus", 0444, oplus_secure_common_dir, &rpmbEnableStatus_proc_fops);
             if (!pentry) {
@@ -571,11 +525,6 @@ static int oplus_secure_common_probe(struct platform_device *secure_dev)
 
         secure_data->dev = dev;
         secure_data_ptr = secure_data;
-
-#ifdef QCOM_PLATFORM
-        // parse cmdline
-        oplus_secure_parse_cmdline();
-#endif
 
         //add to get the parent dts oplus_secure_common
         ret = secure_common_parse_parent_dts(secure_data);

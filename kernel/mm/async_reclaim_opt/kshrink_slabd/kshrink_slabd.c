@@ -29,7 +29,7 @@ wait_queue_head_t shrink_slabd_wait;
 struct async_slabd_parameter {
 	struct mem_cgroup *shrink_slabd_memcg;
 	gfp_t shrink_slabd_gfp_mask;
-	atomic_t shrink_slabd_runnable;
+	int shrink_slabd_runnable;
 	int shrink_slabd_nid;
 	int priority;
 } asp;
@@ -47,18 +47,16 @@ bool wakeup_shrink_slabd(gfp_t gfp_mask, int nid,
 				 struct mem_cgroup *memcg,
 				 int priority)
 {
-	if (unlikely(!async_shrink_slabd_setup))
+	if (unlikely(!async_shrink_slabd_setup) ||
+			(asp.shrink_slabd_runnable == 1))
 		return false;
-
-	if (atomic_read(&(asp.shrink_slabd_runnable)) == 1)
-		return true;
 
 	current->reclaim_state = &async_reclaim_state;
 	asp.shrink_slabd_gfp_mask = gfp_mask;
 	asp.shrink_slabd_nid = nid;
 	asp.shrink_slabd_memcg = memcg;
 	asp.priority = priority;
-	atomic_set(&(asp.shrink_slabd_runnable), 1);
+	asp.shrink_slabd_runnable = 1;
 
 	wake_up_interruptible(&shrink_slabd_wait);
 
@@ -124,12 +122,12 @@ static int kshrink_slabd_func(void *p)
 	asp.shrink_slabd_gfp_mask = 0;
 	asp.shrink_slabd_nid = 0;
 	asp.shrink_slabd_memcg = NULL;
-	atomic_set(&(asp.shrink_slabd_runnable), 0);
+	asp.shrink_slabd_runnable = 0;
 	asp.priority = 0;
 
 	while (!kthread_should_stop()) {
 		wait_event_freezable(shrink_slabd_wait,
-					(atomic_read(&(asp.shrink_slabd_runnable)) == 1));
+					(asp.shrink_slabd_runnable == 1));
 
 		set_async_slabd_cpus();
 
@@ -140,7 +138,7 @@ static int kshrink_slabd_func(void *p)
 
 		shrink_slab(gfp_mask, nid, memcg, priority);
 
-		atomic_set(&(asp.shrink_slabd_runnable), 0);
+		asp.shrink_slabd_runnable = 0;
 	}
 	current->flags &= ~(PF_MEMALLOC | PF_SWAPWRITE | PF_KSWAPD);
 	current->reclaim_state = NULL;

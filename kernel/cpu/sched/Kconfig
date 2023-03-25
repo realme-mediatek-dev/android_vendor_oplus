@@ -80,16 +80,3 @@ config OPLUS_FEATURE_FRAME_BOOST
 	help
 	  This moduler is used to improve frame missing by aggregating key-threads in one group,
 	  then adjust cpu frequence and placement.
-config LOCKING_PROTECT
-	bool "locking protect"
-	depends on OPLUS_FEATURE_SCHED_ASSIST
-	default n
-	help
-	   protect locking protect.
-
-config OPLUS_FEATURE_BAN_APP_SET_AFFINITY
-	bool "config ban app set affinity"
-	default n
-	help
-	  ban app set affinity
-

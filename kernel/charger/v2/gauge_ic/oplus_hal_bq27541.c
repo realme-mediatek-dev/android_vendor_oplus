@@ -721,7 +721,7 @@ static int oplus_fg_reset(struct oplus_chg_ic_dev *ic_dev,
 	return 0;
 }
 
-/* OPPO 2021-06-20 Add begin for zy0603 bad battery. */
+/* OPLUS 2021-06-20 Add begin for zy0603 bad battery. */
 static int zy0603_start_checksum_cal(struct chip_bq27541 *chip)
 {
 	u8 update_checksum[2] = {0x05, 0x00};
@@ -1354,7 +1354,7 @@ static bool zy0603_afi_update_done(void)
 	}
 
 	if (gauge_ic->batt_zy0603 && gauge_ic->afi_count > 0 && !gauge_ic->afi_update_done) {
-		chg_info("return for afi_update_done not finished\n");
+		printk(KERN_ERR "[%s] return for afi_update_done not finished\n");
 		return false;
 	} else {
 		return true;
@@ -4787,8 +4787,8 @@ static int bq28z610_set_bcc_debug_parameters(struct oplus_chg_ic_dev *ic_dev, co
 				__func__, bcc_debug_mode);
 		}
 		strncpy(bcc_debug_buf, buf + 8, strlen(buf) - 8);
-		chg_info("bcc_debug_buf:%s, temp_buf:%s\n",
-			 bcc_debug_buf, temp_buf);
+		printk(KERN_ERR "%s bcc_debug_buf:%s, temp_buf\n",
+			__func__, bcc_debug_buf, temp_buf);
 		return ret;
 	}
 #endif

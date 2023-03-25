@@ -29,9 +29,7 @@
 #include <linux/device.h>
 #include <linux/regmap.h>
 #include <linux/iio/consumer.h>
-#ifndef CONFIG_OPLUS_CHARGER_MTK
 #include <uapi/linux/qg.h>
-#endif
 #include <linux/timer.h>
 #include <linux/fs.h>
 
@@ -84,9 +82,27 @@ static void p9418_power_onoff_switch(int value);
 
 void __attribute__((weak)) notify_pen_state(int state) {return;}
 
+extern struct blocking_notifier_head hall_notifier;
 static struct notifier_block p9418_notifier ={
 	.notifier_call = p9418_hall_notifier_callback,
 };
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+/* only for GKI compile */
+unsigned int __attribute__((weak)) get_PCB_Version(void)
+{
+	return EVT2 + 1;
+}
+
+static inline void do_gettimeofday(struct timeval *tv)
+{
+        struct timespec64 now;
+
+        ktime_get_real_ts64(&now);
+        tv->tv_sec = now.tv_sec;
+        tv->tv_usec = now.tv_nsec/1000;
+}
+#endif
 
 static DEFINE_MUTEX(p9418_i2c_access);
 
@@ -242,7 +258,7 @@ void p9418_check_point_function(struct work_struct *work)
 	do {
 		msleep(500);
 		cnt++;
-		if (cnt > 20) { /* 10s get ble addr time out*/
+		if (cnt > 10) { /* 5s get ble addr time out*/
 			g_ble_timeout_cnt++;
 			chg_err("check point update ble addr get timeout n");
 			break;
@@ -666,7 +682,7 @@ static int p9418_MTP(struct oplus_p9418_ic *chip, unsigned char *fw_buf, int fw_
 	/* disable power P9415 */
 	chg_err("<IDT UPDATE> Disable power P9415.\n");
 	p9418_power_enable(chip, false);
-	msleep(3000);
+	msleep(5000);
 
 	/* power P9415 again */
 	chg_err("<IDT UPDATE> Power P9415 again.\n");
@@ -807,8 +823,8 @@ static int p9418_check_idt_fw_update(struct oplus_p9418_ic *chip)
 	} else {
 		chg_err("<IDT UPDATE>The idt fw version: %02x %02x %02x %02x\n", temp[0], temp[1], temp[2], temp[3]);
 
-		fw_buf = chip->wls_pen_fwdata;
-		fw_size = chip->pen_fw_lenth;
+		fw_buf = p9418_idt_firmware;
+		fw_size = ARRAY_SIZE(p9418_idt_firmware);
 
 		fw_ver_start_addr = fw_size - 128;
 		chg_err("<IDT UPDATE>The new fw version: %02x %02x %02x %02x\n",
@@ -914,20 +930,13 @@ static int oplus_wpc_chg_parse_chg_dt(struct oplus_p9418_ic *chip)
 		chip->power_expired_time = POWER_EXPIRED_TIME_DEFAULT;
 	}
 
-	chip->wls_pen_fwdata = (char *)of_get_property(node, "oplus,wls_pen_fwdata", &chip->pen_fw_lenth);
-	if (!chip->wls_pen_fwdata) {
-		pr_err("parse wls pen fw data failed\n");
-		chip->wls_pen_fwdata = p9418_idt_firmware;
-		chip->pen_fw_lenth = sizeof(p9418_idt_firmware);
-	} else {
-		pr_err("parse fw boot data lenth[%d]\n", chip->pen_fw_lenth);
-	}
-
 	return 0;
 }
 
 void update_powerdown_info(struct oplus_p9418_ic *chip, uint8_t type)
 {
+	struct timeval now_time;
+
 	if (type >= PEN_OFF_REASON_MAX) {
 		chg_err("update power type error:%d.\n", type);
 		return;
@@ -939,7 +948,8 @@ void update_powerdown_info(struct oplus_p9418_ic *chip, uint8_t type)
 
 	chip->power_disable_reason = type;
 	chip->power_disable_times[type]++;
-	chip->charger_done_time = (ktime_to_ms(ktime_get()) - chip->tx_start_time)/MIN_TO_MS;
+	do_gettimeofday(&now_time);
+	chip->charger_done_time = (now_time.tv_sec * 1000 + now_time.tv_usec / 1000 - chip->tx_start_time)/MIN_TO_MS;
 }
 
 void p9418_ept_type_detect_func(struct oplus_p9418_ic *chip)
@@ -1038,6 +1048,7 @@ static void p9418_check_private_flag(struct oplus_p9418_ic *chip)
 static void p9418_commu_data_process(struct oplus_p9418_ic *chip)
 {
 	int rc = 0;
+	struct timeval now_time;
 
 	rc = p9418_read_reg(chip, P9418_REG_INT_FLAG, chip->int_flag_data, 4);
 	if (rc) {
@@ -1048,7 +1059,8 @@ static void p9418_commu_data_process(struct oplus_p9418_ic *chip)
 	if (chip->int_flag_data[1] & P9418_INT_FLAG_BLE_ADDR) {
 		if (!chip->ble_mac_addr) {
 			p9418_set_ble_addr(chip);
-			chip->upto_ble_time = ktime_to_ms(ktime_get()) - chip->tx_start_time;
+			do_gettimeofday(&now_time);
+			chip->upto_ble_time = now_time.tv_sec * 1000 + now_time.tv_usec / 1000 - chip->tx_start_time;
 			chg_err("GET_BLE_ADDR.(%d)\n", chip->upto_ble_time);
 			if (p9418_valid_check(chip)) {
 				if (PEN_REASON_RECHARGE != chip->power_enable_reason) {
@@ -1487,9 +1499,26 @@ void p9418_timer_inhall_function(struct work_struct *work)
 	return;
 }
 
+void power_expired_do_check(struct oplus_p9418_ic *chip)
+{
+	struct timeval now_time;
+	u64 time_offset = 0;
+
+	if (chip->is_power_on) {
+		do_gettimeofday(&now_time);
+		time_offset = now_time.tv_sec * 1000 + now_time.tv_usec / 1000 - chip->tx_start_time;
+		chg_err("%s:time_offset(%lld).\n", __func__, time_offset);
+		if ((time_offset/MIN_TO_MS) >= chip->power_expired_time) {
+			p9418_disable_tx_power(chip);
+			update_powerdown_info(chip, PEN_REASON_CHARGE_TIMEOUT);
+		}
+	}
+
+	return;
+}
+
 void power_expired_check_func(struct work_struct *work)
 {
-	u64 time_offset = 0;
 	struct delayed_work *dwork = to_delayed_work(work);
 	struct oplus_p9418_ic *chip = container_of(dwork, struct oplus_p9418_ic, power_check_work);
 
@@ -1502,14 +1531,7 @@ void power_expired_check_func(struct work_struct *work)
 	mutex_lock(&chip->flow_mutex);
 
 	chg_err("%s:time_offset check.\n", __func__);
-	if (chip->is_power_on) {
-		time_offset = ktime_to_ms(ktime_get()) - chip->tx_start_time;
-		chg_err("%s:time_offset(%lld).\n", __func__, time_offset);
-		if ((time_offset/MIN_TO_MS) >= chip->power_expired_time) {
-			p9418_disable_tx_power(chip);
-			update_powerdown_info(chip, PEN_REASON_CHARGE_TIMEOUT);
-		}
-	}
+	power_expired_do_check(chip);
 
 	mutex_unlock(&chip->flow_mutex);
 	__pm_relax(chip->bus_wakelock);
@@ -1519,6 +1541,8 @@ void power_expired_check_func(struct work_struct *work)
 
 static void p9418_do_switch(struct oplus_p9418_ic *chip, uint8_t status)
 {
+	struct timeval now_time;
+
 	if (!chip) {
 		return;
 	}
@@ -1529,7 +1553,8 @@ static void p9418_do_switch(struct oplus_p9418_ic *chip, uint8_t status)
 		p9418_set_protect_parameter(chip);
 		p9418_set_tx_mode(1);
 		chip->power_enable_reason = PEN_REASON_NEAR;
-		chip->tx_start_time = ktime_to_ms(ktime_get());
+		do_gettimeofday(&now_time);
+		chip->tx_start_time = now_time.tv_sec * 1000 + now_time.tv_usec / 1000;
 		schedule_work(&idt_timer_work);
 		schedule_delayed_work(&chip->power_check_work, \
 						round_jiffies_relative(msecs_to_jiffies(chip->power_expired_time * MIN_TO_MS)));
@@ -1601,6 +1626,7 @@ static void p9418_power_onoff_switch(int value)
 
 static void p9418_enable_func(struct work_struct *work)
 {
+	struct timeval now_time;
 	struct oplus_p9418_ic *chip = container_of(work, struct oplus_p9418_ic, power_enable_work);
 
 	if(!chip) {
@@ -1626,7 +1652,8 @@ static void p9418_enable_func(struct work_struct *work)
 	p9418_set_tx_mode(1);
 	chip->power_enable_times++;
 	chip->power_enable_reason = PEN_REASON_RECHARGE;
-	chip->tx_start_time = ktime_to_ms(ktime_get());
+	do_gettimeofday(&now_time);
+	chip->tx_start_time = now_time.tv_sec * 1000 + now_time.tv_usec / 1000;
 	schedule_work(&idt_timer_work);
 	cancel_delayed_work(&chip->power_check_work);
 	schedule_delayed_work(&chip->power_check_work, \
@@ -1779,18 +1806,10 @@ static ssize_t p9418_reg_show(struct file *filp, char __user *buff, size_t count
 	return (len < count ? len : count);
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
 static const struct file_operations p9418_add_log_proc_fops = {
 	.write = p9418_reg_store,
 	.read = p9418_reg_show,
 };
-#else
-static const struct proc_ops p9418_add_log_proc_fops = {
-	.proc_write = p9418_reg_store,
-	.proc_read = p9418_reg_show,
-	.proc_lseek = seq_lseek,
-};
-#endif
 
 static void init_p9418_add_log(void)
 {
@@ -1837,16 +1856,9 @@ static ssize_t p9418_data_log_write(struct file *filp, const char __user *buff, 
 	return len;
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
 static const struct file_operations p9418_data_log_proc_fops = {
 	.write = p9418_data_log_write,
 };
-#else
-static const struct proc_ops p9418_data_log_proc_fops = {
-	.proc_write = p9418_data_log_write,
-	.proc_lseek = seq_lseek,
-};
-#endif
 
 static void init_p9418_data_log(void)
 {
@@ -2320,11 +2332,7 @@ static int p9418_driver_probe(struct i2c_client *client, const struct i2c_device
 	mutex_init(&chip->flow_mutex);
 
 	schedule_delayed_work(&chip->p9418_update_work, P9418_UPDATE_INTERVAL);
-#ifdef CONFIG_OPLUS_CHARGER_MTK
-	rc = wireless_register_notify(&p9418_notifier);
-#else
 	rc = blocking_notifier_chain_register(&hall_notifier, &p9418_notifier);
-#endif
 	if (rc < 0) {
 		chg_err("blocking_notifier_chain_register error");
 	}
@@ -2359,6 +2367,7 @@ static int p9418_pm_resume(struct device *dev)
 		chip->i2c_ready = true;
 		chg_err("p9418_pm_resume.\n");
 		wake_up_interruptible(&i2c_waiter);
+		power_expired_do_check(chip);
 	}
 
 	return 0;
@@ -2459,11 +2468,7 @@ int p9418_driver_init(void)
 void p9418_driver_exit(void)
 {
 	i2c_del_driver(&p9418_i2c_driver);
-#ifdef CONFIG_OPLUS_CHARGER_MTK
-	wireless_unregister_notify(&p9418_notifier);
-#else
 	blocking_notifier_chain_unregister(&hall_notifier, &p9418_notifier);
-#endif
 }
 #endif /*LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)*/
 MODULE_DESCRIPTION("Driver for p9418 charger chip");

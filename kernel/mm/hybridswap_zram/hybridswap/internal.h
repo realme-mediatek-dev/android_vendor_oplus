@@ -42,16 +42,13 @@ void hybridswap_loglevel_set(int level);
 int hybridswap_loglevel(void);
 
 #define DUMP_STACK_ON_ERR 0
-#define pt(l, f, ...)	pr_err(" <%d>[%s:%d] [%s:%d]: "f, l,		\
-			       current->comm, current->tgid,		\
+#define pt(l, f, ...)	pr_err(" <%d>[%s:%d] [%s:%d]: "f, l, \
+			       current->comm, current->tgid, \
 			       __func__, __LINE__, ##__VA_ARGS__)
-
 static inline void pr_none(void) {}
-#define hybp(l, f, ...) do {						\
-	(l <= hybridswap_loglevel()) ? pt(l, f, ##__VA_ARGS__) :	\
-				       pr_none();			\
-	if (DUMP_STACK_ON_ERR && l == HS_LOG_ERR)			\
-		dump_stack();						\
+#define hybp(l, f, ...) do {\
+	(l <= hybridswap_loglevel()) ? pt(l, f, ##__VA_ARGS__) : pr_none();\
+	if (DUMP_STACK_ON_ERR && l == HS_LOG_ERR) dump_stack();\
 } while (0)
 
 #define log_err(f, ...)	hybp(HS_LOG_ERR, f, ##__VA_ARGS__)
@@ -359,7 +356,7 @@ typedef struct mem_cgroup_hybridswap {
 	bool in_swapin;
 	bool force_swapout;
 #endif
-} memcg_hybs_t;
+}memcg_hybs_t;
 
 #define MEMCGRP_ITEM_DATA(memcg) ((memcg_hybs_t *)(memcg)->android_oem_data1)
 #define MEMCGRP_ITEM(memcg, item) (MEMCGRP_ITEM_DATA(memcg)->item)
@@ -514,8 +511,8 @@ extern int hybridswap_core_enable(void);
 extern void hybridswap_core_disable(void);
 extern int hybridswap_psi_show(struct seq_file *m, void *v);
 #else
-static inline unsigned long long hybridswap_read_memcg_stats(struct mem_cgroup *mcg,
-							     enum hybridswap_memcg_member mcg_member)
+static inline unsigned long long hybridswap_read_memcg_stats(
+        struct mem_cgroup *mcg, enum hybridswap_memcg_member mcg_member)
 {
 	return 0;
 }
@@ -541,10 +538,10 @@ extern struct cftype mem_cgroup_swapd_legacy_files[];
 extern bool zram_watermark_ok(void);
 extern void wake_all_swapd(void);
 extern void alloc_pages_slowpath_hook(void *data, gfp_t gfp_mask,
-				      unsigned int order, unsigned long delta);
+        unsigned int order, unsigned long delta);
 extern void rmqueue_hook(void *data, struct zone *preferred_zone,
-			 struct zone *zone, unsigned int order, gfp_t gfp_flags,
-			 unsigned int alloc_flags, int migratetype);
+	struct zone *zone, unsigned int order, gfp_t gfp_flags,
+	unsigned int alloc_flags, int migratetype);
 extern void __init swapd_pre_init(void);
 extern void swapd_pre_deinit(void);
 extern void update_swapd_memcg_param(struct mem_cgroup *memcg);
@@ -557,13 +554,4 @@ extern bool hybridswap_swapd_enabled(void);
 static inline bool hybridswap_swapd_enabled(void) { return false; }
 #endif
 
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_HEALTHINFO)
-extern bool is_fg(int uid);
-bool is_fg_mem_cgroup(struct mem_cgroup *memcg);
-#else /* CONFIG_OPLUS_FEATURE_HEALTHINFO */
-static inline bool is_fg_mem_cgroup(struct mem_cgroup *memcg)
-{
-	return false;
-}
-#endif /* CONFIG_OPLUS_FEATURE_HEALTHINFO */
 #endif /* end of HYBRIDSWAP_INTERNAL_H */

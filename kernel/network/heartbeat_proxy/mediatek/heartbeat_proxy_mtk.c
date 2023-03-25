@@ -126,7 +126,7 @@ static void safe_strncpy(char *dest, const char *src, size_t n)
 {
 	strncpy(dest, src, n);
 	if (strlen(src) >= n) {
-		dest[n - 1] = '\0';
+		dest[n-1]= '\0';
 	}
 }
 
@@ -955,7 +955,7 @@ notify_user_with_unlock:
  */
 static int hba_mipc_timeout_ind(mipc_msg_t *msg_ptr)
 {
-	int ret = 0, sync_ret = 0;
+	int ret = 0;
 	int err = HBA_INT_PROCESS_OK;
 	struct hba_list_node_st *hba_node_entry = NULL, *n = NULL;
 	hba_timeout_ind_struct timeout_ind;
@@ -983,18 +983,12 @@ static int hba_mipc_timeout_ind(mipc_msg_t *msg_ptr)
 	timeout_ind.statistics.recv_count = mipc_sys_hba_timeout_ind_get_recv_count(msg_ptr, MIPC_DEF_VAL);
 	timeout_ind.statistics.hitchhike_count = mipc_sys_hba_timeout_ind_get_hitchhike_count(msg_ptr, MIPC_DEF_VAL);
 
-	timeout_ind.seq_sync.tcp_snd_wnd = mipc_sys_hba_timeout_ind_get_tcp_snd_window(msg_ptr, MIPC_DEF_VAL);
-	timeout_ind.seq_sync.tcp_rcv_wnd = mipc_sys_hba_timeout_ind_get_tcp_rcv_window(msg_ptr, MIPC_DEF_VAL);
-	timeout_ind.seq_sync.tcp_snd_nxt = mipc_sys_hba_timeout_ind_get_tcp_snd_nxt_seq(msg_ptr, MIPC_DEF_VAL);
-	timeout_ind.seq_sync.tcp_rcv_nxt = mipc_sys_hba_timeout_ind_get_tcp_rcv_nxt_seq(msg_ptr, MIPC_DEF_VAL);
-
 	spin_lock_bh(&hba_list_lock);
 	list_for_each_entry_safe(hba_node_entry, n, &hba_list.head, list_node) {
 		if (strncmp(hba_node_entry->hba.proxy_key,
 		            timeout_ind.proxy_key, strlen(timeout_ind.proxy_key)) == 0) {
-			sync_ret = hba_sync_seq_from_md(&hba_node_entry->hba, timeout_ind.seq_sync);
-			printk("[heartbeat_proxy_mtk] hba_mipc_timeout_ind proxy_key=%s ret=%d sync=%d.",
-			       timeout_ind.proxy_key, timeout_ind.result, sync_ret);
+			printk("[heartbeat_proxy_mtk] hba_mipc_timeout_ind proxy_key=%s, ret=%d.",
+			       timeout_ind.proxy_key, timeout_ind.result);
 			err = timeout_ind.result;
 			goto notify_user_with_unlock;
 		}

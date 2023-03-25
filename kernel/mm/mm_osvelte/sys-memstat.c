@@ -148,7 +148,7 @@ static int get_dma_buf_info(const void *data, struct file *file, unsigned int n)
 	struct dma_proc *dma_proc;
 	struct dma_info *dma_info;
 
-	if (!is_dma_buf_file(file))
+	if (!file || !is_dma_buf_file(file))
 		return 0;
 
 	dma_proc = (struct dma_proc *)data;
@@ -353,11 +353,6 @@ static void extra_meminfo_proc_show(void *data, struct seq_file *m)
 	show_val_kb(m, "IonTotalUsed:   ",
 		    read_mtrack_mem_usage(MTRACK_DMABUF,
 					  MTRACK_DMABUF_SYSTEM_HEAP));
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_BOOSTPOOL)
-	show_val_kb(m, "RsvPool:        ",
-		    read_mtrack_mem_usage(MTRACK_DMABUF,
-					  MTRACK_DMABUF_BOOST_POOL));
-#endif /* CONFIG_OPLUS_FEATURE_MM_BOOSTPOOL */
 	show_val_kb(m, "GPUTotalUsed:   ",
 		    read_mtrack_mem_usage(MTRACK_GPU,
 					  MTRACK_GPU_TOTAL));

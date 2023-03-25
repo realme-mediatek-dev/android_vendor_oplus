@@ -390,6 +390,9 @@ static void __exit oplus_task_cpustats_exit(void)
 		remove_proc_entry(TASK_CPUSTATS_PROC_NODE, NULL);
 		task_cpustats = NULL;
 	}
+
+	if (task_info)
+		remove_proc_entry(TASK_CPUSTATS_FILE, NULL);
 }
 
 module_init(oplus_task_cpustats_init);

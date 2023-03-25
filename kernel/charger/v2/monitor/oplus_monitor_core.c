@@ -659,7 +659,6 @@ static void oplus_monitor_vooc_subs_callback(struct mms_subscribe *subs,
 						false);
 			if (!!data.intval)
 				chip->chg_ctrl_by_vooc = true;
-			break;
 		default:
 			break;
 		}

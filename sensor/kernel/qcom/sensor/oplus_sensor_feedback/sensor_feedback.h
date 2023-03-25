@@ -34,9 +34,6 @@
 #undef	SUBSYS_COUNTS
 #define	SUBSYS_COUNTS	(3)
 
-#undef	SLEEP_INFO_CNT
-#define	SLEEP_INFO_CNT	(48)
-
 struct sensor_fb_conf {
 	uint16_t event_id;
 	char *fb_field;
@@ -48,13 +45,6 @@ enum {
 	REQ_DEBUG_SLEEP_RATIO = 2,
 	REQ_SSR_SLEEP_RATIO = 3,
 	REQ_SSR_GLINK = 4,
-	REQ_SSC_POWER_INFO = 5,
-};
-
-enum {
-	SCREEN_INIT = 0,
-	SCREEN_ON = 1,
-	SCREEN_OFF = 2,
 };
 
 enum sensor_fb_event_id {
@@ -80,7 +70,6 @@ enum sensor_fb_event_id {
 	ALS_FIRST_REPORT_DELAY_COUNT_ID = 105,
 	ALS_ORIGIN_DATA_TO_ZERO_ID = 106,
 	ALS_CALI_DATA_ID = 107,
-	ALS_CG_RPT_INFO_ID = 108,
 
 	/*200~300*/
 	ACCEL_INIT_FAIL_ID = 200,
@@ -130,39 +119,19 @@ enum sensor_fb_event_id {
 	/*600~700*/
 	BAROMETER_I2C_ERR_ID = 600,
 
-	/*700~750*/
+	/*700~800*/
 	HALL_I2C_ERR_ID = 700,
-
-	/*750~789*/
-	FOLD_DEVICE_FOLDE_COUNT_ID = 750,
-
-	/*790~799*/
-	FREE_FALL_TRIGGER_ID = 790,
 
 	/*800~900*/
 	POWER_SENSOR_INFO_ID = 800,
-	POWER_WAKE_UP_RATE_ID = 801,
-	POWER_ADSP_SLEEP_RATIO_ID = 802,
-	POWER_ADSP_SLEEP_STATS_ID = 803,
-
-	POWER_ACCEL_INFO_ID = 810,
-	POWER_GYRO_INFO_ID = 811,
-	POWER_MAG_INFO_ID = 812,
-	POWER_PROXIMITY_INFO_ID = 813,
-	POWER_LIGHT_INFO_ID = 814,
-	POWER_WISE_LIGHT_INFO_ID = 815,
-	POWER_AMBIENT_LIGHT_INFO_ID = 816,
-	POWER_WISE_RGB_INFO_ID = 817,
-	POWER_RGB_INFO_ID = 818,
-	POWER_FLICKER_INFO_ID = 819,
-	POWER_AMBIENT_LIGHT_REAR_INFO_ID = 820,
-	POWER_RGB_REAR_INFO_ID = 821,
-	POWER_FLICKER_REAR_INFO_ID = 822,
-	POWER_SPECTRAL_REAR_INFO_ID = 823,
-	POWER_HALL_INFO_ID = 824,
-	POWER_PRESSURE_INFO_ID = 825,
-	POWER_SAR_INFO_ID = 826,
-	POWER_SARS_INFO_ID = 827,
+	POWER_ACCEL_INFO_ID = 801,
+	POWER_GYRO_INFO_ID = 802,
+	POWER_MAG_INFO_ID = 803,
+	POWER_PROXIMITY_INFO_ID = 804,
+	POWER_LIGHT_INFO_ID = 805,
+	POWER_WISE_LIGHT_INFO_ID = 806,
+	POWER_WAKE_UP_RATE_ID = 807,
+	POWER_ADSP_SLEEP_RATIO_ID = 808,
 
 	/*900~1000*/
 	DOUBLE_TAP_REPORTED_ID = 901,
@@ -195,11 +164,9 @@ struct fd_data {
 	int data_x;
 	int data_y;
 	int data_z;
-	int data_1;
-	int data_2;
 };
 
-#define EVNET_DATA_LEN 5
+#define EVNET_DATA_LEN 3
 struct sns_fb_event {
 	unsigned short event_id;
 	unsigned int count;
@@ -219,8 +186,7 @@ struct fb_event_smem {
 
 enum {
 	WAKE_UP,
-	NO_WAKEUP,
-	DELIVERY_TYPE_MAX,
+	NO_WAKEUP
 };
 
 enum {
@@ -228,16 +194,7 @@ enum {
 	APSS,
 	ADSP,
 	MDSP,
-	CDSP,
-	NCS,
-	PROC_TYPE_MAX,
-};
-
-enum {
-	MSG_ID_513,
-	MSG_ID_514,
-	MSG_ID_OTHER,
-	MSG_ID_MAX,
+	CDSP
 };
 
 struct delivery_type {
@@ -250,24 +207,6 @@ struct proc_type {
 	int type;
 };
 
-struct req_msg_id {
-	char *name;
-	int type;
-};
-
-struct subsys_sleep_info {
-	char *name;
-	uint64_t arr[SLEEP_INFO_CNT];
-	uint64_t max;
-	uint64_t min;
-	uint64_t avr;
-};
-
-struct subsys_sleep_stats {
-	int count;
-	struct subsys_sleep_info sleep_info[SUBSYS_COUNTS];
-	uint64_t time_s;
-};
 
 struct sensor_fb_cxt {
 	/*struct miscdevice sensor_fb_dev;*/
@@ -287,7 +226,5 @@ struct sensor_fb_cxt {
 #endif /*__SENSOR_FEEDBACK_H__*/
 
 void send_uevent_to_fb(int monitor_info);
-#if IS_ENABLED(CONFIG_OPLUS_SENSOR_DRM_PANEL_NOTIFY)
-void ssc_fb_set_screen_status(int status);
-#endif /*CONFIG_OPLUS_SENSOR_DRM_PANEL_NOTIFY*/
+
 

@@ -7,7 +7,7 @@
 #include "cts_test.h"
 #include "cts_strerror.h"
 #include "cts_sysfs.h"
-#include "../../touchpanel_common.h"
+#include "../touchpanel_common.h"
 
 
 struct chipone_ts_data *chipone_ts_data = NULL;
@@ -547,7 +547,7 @@ int cts_plat_reset_device(struct cts_platform_data *pdata)
     gpio_set_value(pdata->rst_gpio, 0);
     mdelay(10);
     gpio_set_value(pdata->rst_gpio, 1);
-    mdelay(50);
+    mdelay(40);
     return 0;
 }
 
@@ -892,7 +892,8 @@ static int cts_reset(void *chip_data)
 {
     struct chipone_ts_data *cts_data = (struct chipone_ts_data *)chip_data;
     int ret;
-    mdelay(10);
+
+    cts_plat_reset_device(cts_data->pdata);
 
     ret = cts_fw_update(chip_data, NULL, false);
     if (ret == FW_UPDATE_SUCCESS) {

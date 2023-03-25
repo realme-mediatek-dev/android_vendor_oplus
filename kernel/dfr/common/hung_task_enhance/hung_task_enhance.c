@@ -34,14 +34,6 @@
 #include <soc/oplus/dfr/theia_send_event.h> /* for theia_send_event etc */
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-#define GET_STATE(t) (t->__state)
-#include <linux/printk.h>
-#else
-#define GET_STATE(t) (t->state)
-#endif
-
-
 #if IS_ENABLED (CONFIG_OPLUS_FEATURE_DEATH_HEALER)
 /* 
  * format: task_name,reason. e.g. system_server,uninterruptible for 60 secs
@@ -192,21 +184,21 @@ static void oplus_check_hung_task(struct task_struct *t, unsigned long timeout, 
 	}
 	if (is_usersapce_key_process(t))
 	{
-		if (GET_STATE(t) == TASK_UNINTERRUPTIBLE)
+		if (t->state == TASK_UNINTERRUPTIBLE)
 			snprintf(sysctl_hung_task_kill, HUNG_TASK_KILL_LEN, "%s,uninterruptible for %lu seconds", t->comm, timeout);
-		else if (GET_STATE(t) == TASK_STOPPED)
+		else if (t->state == TASK_STOPPED)
 			snprintf(sysctl_hung_task_kill, HUNG_TASK_KILL_LEN, "%s,stopped for %lu seconds", t->comm, timeout);
-		else if (GET_STATE(t) == TASK_TRACED)
+		else if (t->state == TASK_TRACED)
 			snprintf(sysctl_hung_task_kill, HUNG_TASK_KILL_LEN, "%s,traced for %lu seconds", t->comm, timeout);
 		else
 			snprintf(sysctl_hung_task_kill, HUNG_TASK_KILL_LEN, "%s,unknown hung for %lu seconds", t->comm, timeout);
 
 		printk(KERN_ERR "DeathHealer: task %s:%d blocked for more than %lu seconds in state 0x%lx. Count:%d\n",
-			t->comm, t->pid, timeout, GET_STATE(t), death_count+1);
+			t->comm, t->pid, timeout, t->state, death_count+1);
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_THEIA) && (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 		memset(extra_info, 0, sizeof(extra_info));
-		snprintf(extra_info, 64, "DeathHealer: task %s:%d blocked for more than %lu seconds in state 0x%lx. Count:%d\n",
-			t->comm, t->pid, timeout, GET_STATE(t), death_count + 1);
+		snprintf(extra_info, 64, "DeathHealer: task %s:%d blocked for more than %ld seconds in state 0x%lx. Count:%d\n",
+			t->comm, t->pid, timeout, t->state, death_count + 1);
 		theia_send_event(THEIA_EVENT_HUNGTASK, THEIA_LOGINFO_KERNEL_LOG, t->pid, extra_info);
 #endif
 
@@ -243,9 +235,7 @@ static void oplus_check_hung_task(struct task_struct *t, unsigned long timeout, 
 #endif
 
 	if (sysctl_hung_task_panic) {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
 		console_verbose();
-#endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
 		*show_lock = true;
 		*call_panic = true;
@@ -273,7 +263,7 @@ static void oplus_check_hung_task(struct task_struct *t, unsigned long timeout, 
 	{
 		if (sysctl_hung_task_warnings > 0)
 			sysctl_hung_task_warnings--;
-		pr_err("INFO: task %s:%d blocked for more than %lu seconds.\n",
+		pr_err("INFO: task %s:%d blocked for more than %ld seconds.\n",
 			t->comm, t->pid, timeout);
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
 		pr_err("      %s %s %.*s\n",
@@ -297,7 +287,7 @@ void io_check_hung_detection(void *ignore, struct task_struct *t, unsigned long 
 {
 #if IS_ENABLED (CONFIG_OPLUS_FEATURE_DEATH_HEALER)
 	/* add io wait monitor */
-	if (GET_STATE(t) == TASK_UNINTERRUPTIBLE || GET_STATE(t) == TASK_STOPPED || GET_STATE(t) == TASK_TRACED)
+	if (t->state == TASK_UNINTERRUPTIBLE || t->state == TASK_STOPPED || t->state == TASK_TRACED)
 		oplus_check_hung_task(t, timeout, need_check);
 #endif
 	return;
@@ -352,7 +342,7 @@ void io_check_hung_detection(struct task_struct *t, unsigned long timeout, unsig
 {
 #ifdef CONFIG_OPLUS_FEATURE_DEATH_HEALER
 	/* add io wait monitor */
-	if (GET_STATE(t) == TASK_UNINTERRUPTIBLE || GET_STATE(t) == TASK_STOPPED || GET_STATE(t) == TASK_TRACED)
+	if (t->state == TASK_UNINTERRUPTIBLE || t->state == TASK_STOPPED || t->state == TASK_TRACED)
 		/* Check for selective monitoring */
 		if (!sysctl_hung_task_selective_monitoring ||
 			t->hang_detection_enabled)

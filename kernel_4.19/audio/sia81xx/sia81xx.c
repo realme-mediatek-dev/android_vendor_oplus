@@ -2773,11 +2773,6 @@ static int sia81xx_probe(struct platform_device *pdev)
 	/* sava driver private data to the dev's driver data */
 	dev_set_drvdata(&pdev->dev, sia81xx);
 
-#ifdef OPLUS_BUG_COMPATIBILITY
-        if(g_sia81xx == NULL)
-		g_sia81xx = sia81xx;
-#endif /* OPLUS_BUG_COMPATIBILITY */
-
 	/* probe other sub module */
 	if(1 == sia81xx->en_dyn_ud_vdd) {
 		sia81xx_auto_set_vdd_probe(
@@ -2828,9 +2823,7 @@ static int sia81xx_remove(struct platform_device *pdev)
 	}
 
 	sia81xx->pdev = NULL;
-#ifdef OPLUS_BUG_COMPATIBILITY
-        g_sia81xx = NULL;
-#endif /* OPLUS_BUG_COMPATIBILITY */
+
 	put_sia81xx_dev(sia81xx);
 
 	return 0;

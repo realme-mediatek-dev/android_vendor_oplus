@@ -261,16 +261,12 @@ unsigned int is_new_cdt(void)/*Q and R is new*/
 {
     struct device_node *np = NULL;
     int ret = -1;
-
-	if (-1 == newcdt) {
-        np = of_find_node_by_name(NULL, "oplus_project");
-        ret = of_property_read_u32(np, "newcdt", &newcdt);
-
-	if (ret) {
-			return 0;
-        }
+    np = of_find_node_by_name(NULL, "oplus_project");
+    ret = of_property_read_u32(np,"newcdt", &newcdt);
+    if(ret){
+//        pr_err("read newcdt fail\n");
+		return 0;
     }
-
     if(newcdt == 1) {
         return 1;
 	}

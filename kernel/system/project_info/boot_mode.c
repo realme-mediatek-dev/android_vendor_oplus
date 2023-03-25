@@ -27,7 +27,7 @@ int __init  board_ftm_mode_init(void)
 {
 #if IS_MODULE(CONFIG_OPLUS_FEATURE_PROJECTINFO)
 	if(oplus_ftm_mode != NULL) {
-		pr_err("oplus_ftm_mode from cmdline : %s\n",oplus_ftm_mode);
+		pr_err("oplus_ftm_mode from cmdline : %s\n", oplus_ftm_mode);
 		if (strcmp(oplus_ftm_mode, "factory2") == 0) {
 			ftm_mode = MSM_BOOT_MODE__FACTORY;
 			pr_err("kernel ftm OK\r\n");
@@ -43,14 +43,14 @@ int __init  board_ftm_mode_init(void)
 			ftm_mode = MSM_BOOT_MODE__SILENCE;
 		} else if (strcmp(oplus_ftm_mode, "ftmsau") == 0) {
 			ftm_mode = MSM_BOOT_MODE__SAU;
-        } else if (strcmp(oplus_ftm_mode, "ftmaging") == 0) {
-            ftm_mode = MSM_BOOT_MODE__AGING;
+		} else if (strcmp(oplus_ftm_mode, "ftmaging") == 0) {
+			ftm_mode = MSM_BOOT_MODE__AGING;
 		} else if (strcmp(oplus_ftm_mode, "ftmsafe") == 0) {
 			ftm_mode = MSM_BOOT_MODE__SAFE;
 		}
 	}
 #else
-    char *substr;
+	char *substr;
 
 	substr = strstr(boot_command_line, "oplus_ftm_mode=");
 	if (substr) {
@@ -71,8 +71,8 @@ int __init  board_ftm_mode_init(void)
 			ftm_mode = MSM_BOOT_MODE__SILENCE;
 		} else if (strncmp(substr, "ftmsau", 6) == 0) {
 			ftm_mode = MSM_BOOT_MODE__SAU;
-        } else if (strncmp(substr, "ftmaging", 8) == 0) {
-            ftm_mode = MSM_BOOT_MODE__AGING;
+		} else if (strncmp(substr, "ftmaging", 8) == 0) {
+			ftm_mode = MSM_BOOT_MODE__AGING;
 		} else if (strncmp(substr, "ftmsafe", 7) == 0) {
 			ftm_mode = MSM_BOOT_MODE__SAFE;
 		}
@@ -111,15 +111,15 @@ static struct attribute_group attr_group = {
 char pwron_event[MAX_CMD_LENGTH + 1];
 static int __init start_reason_init(void)
 {
-#if IS_MODULE(CONFIG_OPLUS_FEATURE_PROJECTINFO)	
+#if IS_MODULE(CONFIG_OPLUS_FEATURE_PROJECTINFO)
 	if(startup_mode != NULL) {
-		pr_err("startup_mode from cmdline : %s\n",startup_mode);
+		pr_err("startup_mode from cmdline : %s\n", startup_mode);
 		strcpy(pwron_event, startup_mode);
 		pwron_event[strlen(startup_mode)] = '\0';
 		pr_info("parse poweron reason %s i = %d\n", pwron_event, strlen(startup_mode));
 	}
 #else
-    int i;
+	int i;
 	char * substr = strstr(boot_command_line, "androidboot.startupmode=");
 	if (NULL == substr) {
 		return 0;
@@ -160,10 +160,13 @@ bool op_is_monitorable_boot(void)
 		return true;
 	} else if (!strcmp(boot_mode, "kernel")) {
 		return true;
+	} else if (!strcmp(boot_mode, "rtc")) {
+		return true;
 	} else {
 		return false;
 	}
 }
+EXPORT_SYMBOL(op_is_monitorable_boot);
 #endif
 
 char charger_reboot[MAX_CMD_LENGTH + 1];
@@ -186,7 +189,7 @@ static int __init oplus_charger_reboot(void)
 		strcpy(charger_reboot, charger_present);
 		charger_reboot[strlen(charger_present)] = '\0';
 #else
-    int i;
+	int i;
 	char * substr = strstr(boot_command_line, "oplus_charger_present=");
 	if (substr) {
 		substr += strlen("oplus_charger_present=");
@@ -209,7 +212,7 @@ int __init  board_boot_mode_init(void)
 		strcpy(boot_mode, bootmode);
 		boot_mode[strlen(bootmode)] = '\0';
 #else
-    int i;
+	int i;
 	char *substr;
 
 	substr = strstr(boot_command_line, "androidboot.mode=");

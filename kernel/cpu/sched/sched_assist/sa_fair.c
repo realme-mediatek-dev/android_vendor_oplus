@@ -15,9 +15,6 @@
 #endif
 
 #include <trace_sched_assist.h>
-#ifdef CONFIG_LOCKING_PROTECT
-#include "sched_assist_locking.h"
-#endif
 
 extern unsigned int sysctl_sched_latency;
 extern struct ux_sched_cputopo ux_sched_cputopo;
@@ -283,20 +280,8 @@ EXPORT_SYMBOL(oplus_replace_next_task_fair);
 inline void oplus_check_preempt_wakeup(struct rq *rq, struct task_struct *p, bool *preempt, bool *nopreempt)
 {
 	struct task_struct *curr = rq->curr;
-#ifdef CONFIG_LOCKING_PROTECT
-	struct oplus_task_struct *ots = get_oplus_task_struct(curr);
-#endif
 	bool wake_ux = false;
 	bool curr_ux = false;
-
-#ifdef CONFIG_LOCKING_PROTECT
-	if (task_inlock(ots) && !task_skip_protect(curr)) {
-		locking_wakeup_preepmt_enable = 1;
-		*nopreempt = true;
-		*preempt = false;
-		return;
-	}
-#endif
 
 	if (likely(!global_sched_assist_enabled))
 		return;
@@ -493,7 +478,6 @@ void android_rvh_place_entity_handler(void *unused, struct cfs_rq *cfs_rq, struc
 {
 }
 
-/* implement vender hook in sched_assist_locking.c */
 void android_rvh_check_preempt_tick_handler(void *unused, struct task_struct *p, unsigned long *ideal_runtime)
 {
 }
@@ -517,10 +501,6 @@ void android_rvh_replace_next_task_fair_handler(void *unused,
 		struct rq *rq, struct task_struct **p, struct sched_entity **se, bool *repick, bool simple, struct task_struct *prev)
 {
 	oplus_replace_next_task_fair(rq, p, se, repick, simple);
-#ifdef CONFIG_LOCKING_PROTECT
-	if (*repick != true)
-		oplus_replace_locking_task_fair(rq, p, se, repick);
-#endif
 }
 
 void android_rvh_can_migrate_task_handler(void *unused, struct task_struct *p, int dst_cpu, int *can_migrate)

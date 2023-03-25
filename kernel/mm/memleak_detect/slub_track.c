@@ -2230,7 +2230,7 @@ int __init create_kmalloc_debug(struct proc_dir_entry *parent)
 
 	mpentry = proc_create("memleak_detect_thread", S_IRUGO|S_IWUGO, parent,
 			&memleak_detect_thread_operations);
-	if (!mpentry) {
+	if (!cpentry) {
 		pr_err("create memleak_detect_thread_operations proc failed.\n");
 		goto remove_cpentry;
 	}

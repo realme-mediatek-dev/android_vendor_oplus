@@ -12,7 +12,6 @@
 static struct sensor_info sensor_list[SENSOR_TYPE_SENSOR_MAX];
 
 extern int sensor_list_get_list(struct sensor_info *list, unsigned int num);
-extern int get_support_sensor_list(struct sensor_info *list);
 
 static oplus_send_comm_to_hub(int sensor_type, int cmd, void *data, uint8_t length)
 {       
@@ -74,7 +73,6 @@ static void init_sensorlist(void)
    int ret = 0;
    ret = sensor_list_get_list(sensor_list, SENSOR_TYPE_SENSOR_MAX);
    if (ret < 0) {
-        get_support_sensor_list(sensor_list);
         DEVINFO_LOG("get sensor list\n");
    }
 }

@@ -20,14 +20,6 @@
 #include <linux/param.h>
 #include <linux/notifier.h>
 
-#if IS_ENABLED(CONFIG_OPLUS_SENSOR_FB_QC)
-enum {
-	SCREEN_INIT = 0,
-	SCREEN_ON = 1,
-	SCREEN_OFF = 2,
-};
-extern void ssc_fb_set_screen_status(int status);
-#endif
 
 
 enum {
@@ -79,7 +71,6 @@ struct ssc_interactive{
 #if IS_ENABLED(CONFIG_OPLUS_SENSOR_DRM_PANEL_NOTIFY)
 	bool is_fold_dev;
 	bool need_lb_algo;
-	bool sup_power_fb;
 	bool notify_work_regiseted;
 	bool notify_work_regiseted_second;
 	uint8_t notify_work_retry;

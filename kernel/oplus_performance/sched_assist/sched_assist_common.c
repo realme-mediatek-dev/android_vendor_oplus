@@ -2648,10 +2648,6 @@ void update_sa_task_stats(struct task_struct *tsk, u64 delta_ns, int stats_type)
 	}
 	if (!sched_assist_scene(SA_CAMERA))
 		return;
-
-	if (!is_sched_boost_group(tsk))
-		return;
-
 	update_task_sched_stat_common(tsk, delta_ns, stats_type);
 
 	try_to_mark_task_type(tsk, TASK_SMALL);

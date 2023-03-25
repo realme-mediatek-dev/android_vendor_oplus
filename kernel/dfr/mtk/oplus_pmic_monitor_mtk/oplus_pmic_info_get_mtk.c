@@ -57,7 +57,7 @@ static int init_pmic_history_fdt(void)
 	}
 	PMICHistory.log_count = log_count;
 	for(i = 0; i < log_count; i++) {
-		snprintf(pmic_string, 32, "pmic_history%d", i);
+		snprintf(pmic_string, 32, "pmic_history%u", i);
 		np = of_find_node_by_name(NULL, pmic_string);
 		if(!np){
 			pr_err("init_pmic_history_fdt don't fine node %s\n", pmic_string);

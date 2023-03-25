@@ -128,13 +128,13 @@ void mt6363_pmic_show(struct PMICHistoryKernelStruct *pmic_history_ptr, char pag
         }
 		if(pon_reason_bit >=0 && pon_reason_bit<=4){
 			printk(KERN_INFO "mt6363_show_pon_reason = %d\n",pon_reason_bit);
-			(*len) += snprintf(&page[(*len)],2048-(*len), "PMIC->pon_reason|%u|0x%02X|:%s\n",
+			(*len) += snprintf(&page[(*len)],2048-(*len), "PMIC->pon_reason|%d|0x%02X|:%s\n",
 						pmic_device_index,
 						cur_pon_reason,
 						mt6363_pon_reason_str[pon_reason_bit]);
 		}else{
 			printk(KERN_INFO "mt6363_show_pon_reason = %d\n",pon_reason_bit);
-			(*len) += snprintf(&page[(*len)],2048-(*len), "PMIC->pon_reason|%u|0x%02X|:%s\n",
+			(*len) += snprintf(&page[(*len)],2048-(*len), "PMIC->pon_reason|%d|0x%02X|:%s\n",
 						pmic_device_index,
 						cur_pon_reason,
 						"adb reboot");
@@ -154,23 +154,23 @@ void mt6363_pmic_show(struct PMICHistoryKernelStruct *pmic_history_ptr, char pag
             poff_reason2_bit++;
         }
 		if(poff_reason_bit>=0 && poff_reason_bit<=15){
-			(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->poff_reason|%u|0x%x|:%s\n",
+			(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->poff_reason|%d|0x%x|:%s\n",
 				pmic_device_index,
 				cur_poff_reason,
 				mt6363_pon_poff_reason_str[poff_reason_bit]);
 		}else{
-			(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->poff_reason|%u|0x%0x|:%s\n",
+			(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->poff_reason|%d|0x%0x|:%s\n",
 			pmic_device_index,
 			cur_poff_reason,
 			"Battery Loss");
 		}
 		if(poff_reason2_bit>=0 && poff_reason_bit<=15){
-			(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->poff_reason2|%u|0x%x|:%s\n",
+			(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->poff_reason2|%d|0x%x|:%s\n",
 				pmic_device_index,
 				cur_poff_reason2,
 				mt6363_pon_poff_reason2_str[poff_reason2_bit]);
 		}else{
-			(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->poff_reason2|%u|0x%x|:%s\n",
+			(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->poff_reason2|%d|0x%x|:%s\n",
 				pmic_device_index,
 				cur_poff_reason2,
 				"closed_source");
@@ -179,11 +179,11 @@ void mt6363_pmic_show(struct PMICHistoryKernelStruct *pmic_history_ptr, char pag
 		//show pg_sdn_sts0 and pg_sdn_sts1
 		cur_pg_sdn_sts0=pmic_reg_value.pg_sdn_sts0;
 		cur_pg_sdn_sts1=pmic_reg_value.pg_sdn_sts1;
-		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->pg_sdn_sts0|%u|0x%x|:%s\n",
+		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->pg_sdn_sts0|%d|0x%x|:%s\n",
 				pmic_device_index,
 				cur_pg_sdn_sts0,
 				"closed_source");
-		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->pg_sdn_sts1|%u|0x%x|:%s\n",
+		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->pg_sdn_sts1|%d|0x%x|:%s\n",
 				pmic_device_index,
 				cur_pg_sdn_sts1,
 				"closed_source");
@@ -191,11 +191,11 @@ void mt6363_pmic_show(struct PMICHistoryKernelStruct *pmic_history_ptr, char pag
 		//show oc_sdn_sts0 and oc_sdn_sts1
 		cur_oc_sdn_sts0=pmic_reg_value.oc_sdn_sts0;
 		cur_oc_sdn_sts1=pmic_reg_value.oc_sdn_sts1;
-		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->oc_sdn_sts0|%u|0x%x|:%s\n",
+		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->oc_sdn_sts0|%d|0x%x|:%s\n",
 				pmic_device_index,
 				cur_oc_sdn_sts0,
 				"closed_source");
-		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->oc_sdn_sts1|%u|0x%x|:%s\n",
+		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->oc_sdn_sts1|%d|0x%x|:%s\n",
 				pmic_device_index,
 				cur_oc_sdn_sts1,
 				"closed_source");
@@ -281,17 +281,17 @@ void mt6359_pmic_show(struct PMICHistoryKernelStruct *pmic_history_ptr, char pag
 		//show pon_reason
 		cur_pon_reason = pmic_reg_value.pon_reason;
 		cur_pon_reason_bak = cur_pon_reason;
-		while(0 != cur_pon_reason_bak) {
-			cur_pon_reason_bak = cur_pon_reason_bak >> 1;
-			pon_reason_bit++;
-		}
+		while(0 != cur_poff_reason_bak) {
+            cur_poff_reason_bak = cur_poff_reason_bak >> 1;
+            pon_reason_bit++;
+        }
 		if(pon_reason_bit>=0 && pon_reason_bit<=4){
-			(*len) += snprintf(&page[(*len)],2048-(*len), "PMIC->pon_reason|%u|0x%02X|:%s\n",
+			(*len) += snprintf(&page[(*len)],2048-(*len), "PMIC->pon_reason|%d|0x%02X|:%s\n",
 						pmic_device_index,
 						cur_pon_reason,
 						mt6359_pon_reason_str[pon_reason_bit]);
 		}else{
-			(*len) += snprintf(&page[(*len)],2048-(*len), "PMIC->pon_reason|%u|0x%02X|:%s\n",
+			(*len) += snprintf(&page[(*len)],2048-(*len), "PMIC->pon_reason|%d|0x%02X|:%s\n",
 						pmic_device_index,
 						cur_pon_reason,
 						"adb reboot");
@@ -305,12 +305,12 @@ void mt6359_pmic_show(struct PMICHistoryKernelStruct *pmic_history_ptr, char pag
             poff_reason_bit++;
         }
 		if (poff_reason_bit>=0 && poff_reason_bit<=14) {
-        	(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->poff_reason|%u|0x%0x|:%s\n",
+        	(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->poff_reason|%d|0x%0x|:%s\n",
 			pmic_device_index,
 			cur_poff_reason,
 			mt6359_poff_reason_str[poff_reason_bit]);
         }else{
-			(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->poff_reason|%u|0x%x|:%s\n",
+			(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->poff_reason|%d|0x%x|:%s\n",
 				pmic_device_index,
 				cur_poff_reason,
 				"Battery Loss");
@@ -319,11 +319,11 @@ void mt6359_pmic_show(struct PMICHistoryKernelStruct *pmic_history_ptr, char pag
 		//show pg_sdn_sts0 and pg_sdn_sts1
 		cur_pg_sdn_sts0=pmic_reg_value.pg_sdn_sts0;
 		cur_pg_sdn_sts1=pmic_reg_value.pg_sdn_sts1;
-		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->pg_sdn_sts0|%u|0x%x|:%s\n",
+		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->pg_sdn_sts0|%d|0x%x|:%s\n",
 				pmic_device_index,
 				cur_pg_sdn_sts0,
 				"closed_source");
-		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->pg_sdn_sts1|%u|0x%x|:%s\n",
+		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->pg_sdn_sts1|%d|0x%x|:%s\n",
 				pmic_device_index,
 				cur_pg_sdn_sts1,
 				"closed_source");
@@ -331,11 +331,11 @@ void mt6359_pmic_show(struct PMICHistoryKernelStruct *pmic_history_ptr, char pag
 		//show oc_sdn_sts0 and oc_sdn_sts1
 		cur_oc_sdn_sts0=pmic_reg_value.oc_sdn_sts0;
 		cur_oc_sdn_sts1=pmic_reg_value.oc_sdn_sts1;
-		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->oc_sdn_sts0|%u|0x%x|:%s\n",
+		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->oc_sdn_sts0|%d|0x%x|:%s\n",
 				pmic_device_index,
 				cur_oc_sdn_sts0,
 				"closed_source");
-		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->oc_sdn_sts1|%u|0x%x|:%s\n",
+		(*len) += snprintf(&page[(*len)], 2048-(*len), "PMIC->oc_sdn_sts1|%d|0x%x|:%s\n",
 				pmic_device_index,
 				cur_oc_sdn_sts1,
 				"closed_source");
@@ -363,7 +363,7 @@ static ssize_t pmic_monitor_show(struct kobject *kobj,
 	//show pmic_magic
 	//len += snprintf(&page[len], 2048-len, "PMIC->pmic_magic = %s\n",&(pmic_history_ptr->pmic_magic));
 	//show pmic_history_count
-	len += snprintf(&page[len], 2048-len, "PMIC->pmic_history_count = %u\n",pmic_history_ptr->log_count);
+	len += snprintf(&page[len], 2048-len, "PMIC->pmic_history_count = %d\n",pmic_history_ptr->log_count);
 	len += snprintf(&page[len], 2048-len, "PMIC->chip_code = %x\n",pmic_history_ptr->pmic_record[0].pmic_pon_poff_reason[0].chip_code);
 
 	pmic_history_count = pmic_history_ptr->log_count;

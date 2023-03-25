@@ -21,5 +21,4 @@ obj-y += mm_osvelte/
 obj-$(CONFIG_KSHRINK_SLABD) += async_reclaim_opt/kshrink_slabd/
 obj-$(CONFIG_PCPPAGES_OPT) += async_reclaim_opt/pcppages_opt/
 
-obj-$(CONFIG_KSHRINK_LRUVECD) += async_reclaim_opt/kshrink_lruvecd/
 obj-$(CONFIG_MAPPED_PROTECT) += memload_opt/mapped_protect/

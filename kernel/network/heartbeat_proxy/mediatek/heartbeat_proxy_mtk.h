@@ -254,7 +254,6 @@ typedef struct
 	char proxy_key[128];
 	hba_result_enum result;
 	uint16_t curr_cycle;
-	hba_seq_sync_msg_struct seq_sync;
 	hba_statistics_msg_struct statistics;
 } hba_timeout_ind_struct;
 

@@ -5,13 +5,6 @@
 
 #ifndef _FRAME_GROUP_H
 #define _FRAME_GROUP_H
-#include <linux/cpufreq.h>
-
-enum FRAME_GROUP_ID {
-	DEFAULT_FRAME_GROUP_ID = 1,
-	SF_FRAME_GROUP_ID,
-	GAME_FRAME_GROUP_ID,
-};
 
 enum DYNAMIC_TRANS_TYPE {
 	DYNAMIC_TRANS_BINDER = 0,
@@ -46,14 +39,13 @@ int frame_group_init(void);
 u64 fbg_ktime_get_ns(void);
 void fbg_add_update_freq_hook(void (*func)(struct rq *rq, unsigned int flags));
 void register_frame_group_vendor_hooks(void);
-int rollover_frame_group_window(int group_id);
+int rollover_frame_group_window(bool composition);
 void set_frame_group_window_size(unsigned int window);
 void set_ui_thread(int pid, int tid);
 void set_render_thread(int pid, int tid);
 void set_sf_thread(int pid, int tid);
 void set_renderengine_thread(int pid, int tid);
 bool add_rm_related_frame_task(int pid, int tid, int add, int r_depth, int r_width);
-bool add_task_to_game_frame_group(int tid, int add);
 bool default_group_update_cpufreq(void);
 int get_frame_group_ui(void);
 
@@ -65,13 +57,6 @@ bool fbg_skip_migration(struct task_struct *tsk, int src_cpu, int dst_cpu);
 bool fbg_skip_rt_sync(struct rq *rq, struct task_struct *p, bool *sync);
 bool check_putil_over_thresh(unsigned long thresh);
 bool fbg_rt_task_fits_capacity(struct task_struct *tsk, int cpu);
-
-void fbg_android_rvh_schedule_handler(struct task_struct *prev,
-	struct task_struct *next, struct rq *rq);
-void fbg_android_rvh_cpufreq_transition(struct cpufreq_policy *policy);
-
-void fbg_get_frame_scale(unsigned long *frame_scale);
-void fbg_get_frame_busy(unsigned int *frame_busy);
 
 int info_show(struct seq_file *m, void *v);
 #endif /* _FRAME_GROUP_H */

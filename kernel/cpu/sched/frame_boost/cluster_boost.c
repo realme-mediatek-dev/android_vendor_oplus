@@ -4,7 +4,9 @@
 #include <../kernel/oplus_cpu/sched/sched_assist/sa_common.h>
 #include "frame_ioctl.h"
 #include "frame_group.h"
-#include "cluster_boost.h"
+
+extern inline unsigned long capacity_of(int cpu);
+extern unsigned long cpu_util_without(int cpu, struct task_struct *p);
 
 static DEFINE_RAW_SPINLOCK(preferred_cluster_id_lock);
 /*

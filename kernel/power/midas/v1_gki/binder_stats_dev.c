@@ -89,7 +89,7 @@ struct binder_stats_item {
  * items size is max_item_cnt, it is config by user.
  * items size BINDER_STATS_MAX_COUNT_LIMIT is invalid.
  */
-struct binder_stats_info {
+struct binder_stats {
 	unsigned int max_item_cnt;
 	unsigned int valid_item_cnt;
 	struct binder_stats_item items[BINDER_STATS_MAX_COUNT_LIMIT];
@@ -173,12 +173,12 @@ struct binder_stats_user_context {
 	struct list_head list_node;
 	int enable;
 	int max_item_cnt;
-	struct binder_stats_info *binder_stats_buf_0; /* double swap buffer 0 */
-	struct binder_stats_info *binder_stats_buf_1; /* double swap buffer 1 */
+	struct binder_stats *binder_stats_buf_0; /* double swap buffer 0 */
+	struct binder_stats *binder_stats_buf_1; /* double swap buffer 1 */
 	struct binder_stats_item_ref *kernel_binder_stats_refs;
 	DECLARE_HASHTABLE(kernel_binder_stats_hash, BINDER_STATS_HASH_ORDER);
-	struct binder_stats_info *kernel_binder_stats;
-	struct binder_stats_info *user_binder_stats;
+	struct binder_stats *kernel_binder_stats;
+	struct binder_stats *user_binder_stats;
 	bool user_mmap_flag;
 	spinlock_t buf_lock;
 
@@ -314,7 +314,7 @@ static bool intreresting_filter(struct binder_stats_user_context *context_ptr,
 static void store_binder_stats_to_kernel(struct binder_notify *data) {
 	struct binder_stats_item *find_item = NULL;
 	unsigned long flags, ctx_flag;
-	struct binder_stats_info *kernel_binder_stats = NULL;
+	struct binder_stats *kernel_binder_stats = NULL;
 	struct binder_stats_item_ref *ref_hash_node;
 	struct binder_stats_user_context *context_ptr = NULL;
 	struct task_struct *caller_task = NULL;
@@ -560,7 +560,7 @@ enable_fail:
 static int user_update_binder_stats(struct binder_stats_user_context *context_ptr) {
 	int ret = 0;
 	unsigned long flags;
-	struct binder_stats_info * swap_tmp;
+	struct binder_stats * swap_tmp;
 	struct binder_stats_item_ref *ref_hash_node;
 	struct hlist_node *tmp;
 	int i;

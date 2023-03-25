@@ -31,9 +31,6 @@
 #include <asm/stacktrace.h>
 #include <linux/kallsyms.h>
 
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
-#include <../kernel/oplus_cpu/sched/frame_boost/frame_group.h>
-#endif
 
 #define MAX_PID_NUM 10
 #define BUFFER_SIZE 5760
@@ -887,10 +884,6 @@ static void cpu_frequency_limits_handler(void *data, struct cpufreq_policy *poli
 
 static void cpufreq_transition_handler(void *data, struct cpufreq_policy *policy)
 {
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
-	fbg_android_rvh_cpufreq_transition(policy);
-#endif
-
 	if (!task_sched_info_enable)
 		return;
 
@@ -930,73 +923,7 @@ static int __init oplus_task_sched_init(void)
 	return 0;
 }
 
-static int unregister_vendor_hooks(void)
-{
-	int rc = 0;
-
-	rc = unregister_trace_android_vh_account_task_time(ctp_send_message_handler, NULL);
-	if (rc != 0) {
-		pr_err("CTP3：unregister_trace_android_vh_account_task_time failed! rc=%d\n", rc);
-		return rc;
-	}
-
-	rc = unregister_trace_task_rename(set_task_comm_handler, NULL);
-	if (rc != 0) {
-		pr_err("CTP3：unregister_trace_task_rename failed! rc=%d\n", rc);
-		return rc;
-        }
-
-	rc = unregister_trace_sched_stat_wait(sched_stat_wait_handler, NULL);
-	if (rc != 0) {
-		pr_err("CTP3：unregister_trace_sched_stat_wait failed! rc=%d\n", rc);
-		return rc;
-	}
-
-	rc = unregister_trace_sched_stat_sleep(sched_stat_sleep_handler, NULL);
-	if (rc != 0) {
-		pr_err("CTP3：unregister_trace_sched_stat_sleep failed! rc=%d\n", rc);
-		return rc;
-	}
-
-	rc = unregister_trace_sched_stat_blocked(sched_stat_blocked_handler, NULL);
-	if (rc != 0) {
-		pr_err("CTP3：unregister_trace_sched_stat_blocked failed! rc=%d\n", rc);
-		return rc;
-	}
-
-	rc = unregister_trace_sched_switch(sched_switch_handler, NULL);
-	if (rc != 0) {
-		pr_err("CTP3：unregister_trace_sched_switch failed! rc=%d\n", rc);
-		return rc;
-	}
-
-	rc = unregister_trace_sched_waking(sched_waking_handler, NULL);
-	if (rc != 0) {
-		pr_err("CTP3：unregister_trace_sched_waking failed! rc=%d\n", rc);
-		return rc;
-	}
-
-	rc = unregister_trace_cpu_frequency_limits(cpu_frequency_limits_handler, NULL);
-	if (rc != 0) {
-		pr_err("CTP3：unregister_trace_cpu_frequency_limits failed! rc=%d\n", rc);
-		return rc;
-	}
-
-	return 0;
-}
-
-static void __exit oplus_task_sched_exit(void)
-{
-	unregister_vendor_hooks();
-
-	if (sched_info) {
-		remove_proc_entry(SCHED_INFO_PROC_NODE, NULL);
-		sched_info = NULL;
-	}
-}
-
 module_init(oplus_task_sched_init);
-module_exit(oplus_task_sched_exit);
 module_param_named(sched_info_ctrl, sched_info_ctrl, bool, 0755);
 MODULE_DESCRIPTION("Oplus Task Sched Vender Hooks Driver");
 MODULE_LICENSE("GPL v2");

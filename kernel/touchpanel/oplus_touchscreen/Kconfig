@@ -109,7 +109,3 @@ endif
 if TOUCHPANEL_ILITEK
 source "drivers/input/touchscreen/oplus_touchscreen/ilitek/Kconfig"
 endif
-
-if TOUCHPANEL_CHIPONE
-source "drivers/input/touchscreen/oplus_touchscreen/chipone/Kconfig"
-endif

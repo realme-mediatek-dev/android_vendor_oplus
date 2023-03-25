@@ -130,7 +130,7 @@ int virtual_sensor_driver_add(struct virtual_sensor_init_info *obj, int handle);
 int virtual_sensor_register_control_path(struct virtual_sensor_control_path *ctl,
     int handle);
 
-extern int virtual_sensor_data_report(struct oplus_sensor_event *event);
+extern int virtual_sensor_data_report(struct oplus_sensor_event event);
 extern int virtual_sensor_flush_report(int handle);
 #endif  //__VIRTUAL_SENSOR_H__
 

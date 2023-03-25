@@ -1365,6 +1365,7 @@ static ssize_t proc_colorctrl_main_parameter_write(struct file *file, const char
 		COLOR_INFO("%s:count > %d\n", PAGESIZE);
 		return count;
 	}
+	buf[strlen(buf)] = '\0';
 	color_para = cd->color_control_para;
 	transparent_para = cd->transparent_control_para;
 	value_cnt = colorctrl_str_parse(buf, name, NAME_TAG_SIZE, split_value, MAX_PARAMETER);

@@ -209,7 +209,7 @@ void perf_warning(struct timer_list *t)
 {
 	struct hybridswap_record_stage *record =
 		from_timer(record, t, lat_monitor);
-	static unsigned long last_dump_lat_jiffies;
+	static unsigned long last_dump_lat_jiffies = 0;
 
 	if (!record->warning_threshold)
 		return;
@@ -335,7 +335,7 @@ void perf_begin(struct hybridswap_record_stage *record,
 
 void hybridswap_perf_lat_stat(struct hybridswap_record_stage *record)
 {
-	int fg = 0;
+	int task_is_fg = 0;
 	struct hybridswap_stat *stat = hybridswap_get_stat_obj();
 	s64 curr_lat;
 	s64 timeout_value[SCENE_MAX] = {
@@ -355,15 +355,15 @@ void hybridswap_perf_lat_stat(struct hybridswap_record_stage *record)
 	if (record->scene == SCENE_FAULT_OUT) {
 		if (curr_lat <= timeout_value[SCENE_FAULT_OUT])
 			return;
-#ifdef CONFIG_OPLUS_FEATURE_HEALTHINFO
-		fg = !!is_fg(task_uid(current).val);
+#ifdef CONFIG_FG_TASK_UID
+		task_is_fg = current_is_fg() ? 1 : 0;
 #endif
 		if (curr_lat > 500000)
-			atomic64_inc(&stat->fault_stat[fg].timeout_500ms_cnt);
+			atomic64_inc(&stat->fault_stat[task_is_fg].timeout_500ms_cnt);
 		else if (curr_lat > 100000)
-			atomic64_inc(&stat->fault_stat[fg].timeout_100ms_cnt);
+			atomic64_inc(&stat->fault_stat[task_is_fg].timeout_100ms_cnt);
 		log_info("task %s:%d fault out timeout us %llu fg %d\n",
-			 current->comm, current->pid, curr_lat, fg);
+			 current->comm, current->pid, curr_lat, task_is_fg);
 	}
 }
 
@@ -4613,8 +4613,8 @@ static unsigned long memcg_reclaim_size(struct mem_cgroup *memcg)
 	}
 
 	cur_size = atomic64_read(&hybs->hybridswap_stored_size);
-	new_size = min((zram_size + cur_size) *
-		atomic_read(&hybs->ub_zram2ufs_ratio) / 100, (unsigned long) SZ_64M);
+	new_size = (zram_size + cur_size) *
+		atomic_read(&hybs->ub_zram2ufs_ratio) / 100;
 
 	hybs->can_eswaped = (new_size > cur_size) ? (new_size - cur_size) : 0;
 	return hybs->can_eswaped;
@@ -4749,7 +4749,7 @@ static int hybridswap_reclaim_check(struct mem_cgroup *memcg,
 		return -EAGAIN;
 	if (unlikely(hybs->in_swapin))
 		return -EAGAIN;
-	if (!hybs->force_swapout && *require_size < EXTENT_SIZE)
+	if (!hybs->force_swapout && *require_size < MIN_RECLAIM_ZRAM_SZ)
 		return -EAGAIN;
 
 	return 0;
@@ -4874,9 +4874,6 @@ static int hybridswap_permcg_reclaim(struct mem_cgroup *memcg,
 
 	require_size_before = require_size;
 	while (require_size) {
-		if (is_fg_mem_cgroup(memcg))
-			break;
-
 		if (hybridswap_reclaim_extent(memcg, sched, &require_size,
 					      mcg_reclaimed_sz, &io_err))
 			break;
@@ -4936,9 +4933,6 @@ static int hybridswap_permcg_reclaimin(struct mem_cgroup *memcg,
 
 	hybs = MEMCGRP_ITEM_DATA(memcg);
 	if (!hybs)
-		return 0;
-
-	if (is_fg_mem_cgroup(memcg))
 		return 0;
 
 	require_size = hybs->can_eswaped * rq->size / rq->out_size;

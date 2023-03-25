@@ -80,21 +80,21 @@ static struct regulator *p61_regulator = NULL;
 
 #ifdef P61_SPI_CLOCK_13_3_Mzh
 //#define P61_SPI_CLOCK 13300000L;Further debug needed
-#define P61_SPI_CLOCK     19000000L
+#define P61_SPI_CLOCK     19000000L;
 #else
 #ifdef P61_SPI_CLOCK_7Mzh
-#define P61_SPI_CLOCK     7000000L
+#define P61_SPI_CLOCK     7000000L;
 #else
 #ifdef P61_SPI_CLOCK_8Mzh
-#define P61_SPI_CLOCK     8000000L
+#define P61_SPI_CLOCK     8000000L;
 #else
 #ifdef P61_SPI_CLOCK_20Mzh
-#define P61_SPI_CLOCK     20000000L
+#define P61_SPI_CLOCK     20000000L;
 #else
 #ifdef P61_SPI_CLOCK_25Mzh
-#define P61_SPI_CLOCK     25000000L
+#define P61_SPI_CLOCK     25000000L;
 #else
-#define P61_SPI_CLOCK     4000000L
+#define P61_SPI_CLOCK     4000000L;
 #endif
 #endif
 #endif
@@ -926,13 +926,7 @@ static int p61_probe(struct spi_device *spi)
 		pr_err("%s: There's no spi-max-frequency property\n", __func__);
 		goto err_exit0;
 	}
-
-	if (P61_SPI_CLOCK < max_speed_hz) {
-		spi->max_speed_hz = P61_SPI_CLOCK;
-	} else {
-		spi->max_speed_hz = max_speed_hz;
-	}
-
+	spi->max_speed_hz = max_speed_hz;
 	//spi->chip_select = SPI_NO_CS;
 	ret = spi_setup(spi);
 	if (ret < 0) {

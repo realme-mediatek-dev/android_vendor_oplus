@@ -7,5 +7,3 @@ obj-$(CONFIG_OPLUS_LOCKING_STRATEGY) += oplus_locking_strategy.o
 oplus_locking_strategy-y += locking_main.o
 oplus_locking_strategy-y += mutex.o
 oplus_locking_strategy-y += rwsem.o
-oplus_locking_strategy-y += futex.o
-oplus_locking_strategy-y += sysfs.o

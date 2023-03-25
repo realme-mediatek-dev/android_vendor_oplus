@@ -19,24 +19,18 @@ static int __init locking_opt_init(void)
 
 	g_opt_enable |= LK_MUTEX_ENABLE;
 	g_opt_enable |= LK_RWSEM_ENABLE;
-	g_opt_enable |= LK_FUTEX_ENABLE;
 
-	lk_sysfs_init();
 	register_rwsem_vendor_hooks();
 	register_mutex_vendor_hooks();
-	register_futex_vendor_hooks();
 
 	return ret;
 }
 
-static void __exit locking_opt_exit(void)
+void __exit locking_opt_exit(void)
 {
 	g_opt_enable = 0;
-
 	unregister_rwsem_vendor_hooks();
 	unregister_mutex_vendor_hooks();
-	unregister_futex_vendor_hooks();
-	lk_sysfs_exit();
 }
 
 module_init(locking_opt_init);

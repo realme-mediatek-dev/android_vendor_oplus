@@ -19,12 +19,6 @@ config KSHRINK_SLABD
 	help
 	  define this config to add oplus memload optimization feature
 
-config KSHRINK_LRUVECD
-	tristate "shrink lruvecd"
-	default n
-	help
-	  define this config to add shrink lruvecd
-
 config PCPPAGES_OPT
 	tristate "pcppages_opt"
 	default n
@@ -33,16 +27,9 @@ config PCPPAGES_OPT
 
 config MAPPED_PROTECT
 	tristate "mapped_protect"
-	default n
+	default m
 	help
 	  mapped_protect
-
-config MAPPED_PROTECT_ALL
-	bool "mapped_protect shirnk_inactive_lru"
-	depends on MAPPED_PROTECT
-	default n
-	help
-	  mapped_protect_all
 
 config PROCESS_RECLAIM_ENHANCE
 	tristate "Enable process reclaim enchance"
@@ -59,12 +46,6 @@ config DUMP_TASKS_MEM
 	default n
 	help
 	  dump all userspace process meminfo
-
-config VMALLOC_VM_DEBUG
-	tristate "Enable vmalloc virtual memory debug"
-	default n
-	help
-	  Debug vmalloc virtual memory leak.
 
 config DYNAMIC_TUNING_SWAPPINESS
 	bool "tuning swappiess depends on file_pages size"

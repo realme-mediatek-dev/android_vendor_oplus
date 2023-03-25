@@ -21,8 +21,6 @@
 #define IR_DEFAULT_VDD_TYPE              0
 #define IR_EXTERNAL_VDD_TYPE             1
 #define IR_PARAM_MAX_SIZE                256*1024
-#define MIN_FREQUENCY 20000
-#define MAX_FREQUENCY 60000
 
 struct hw_core_config_t {
 	int vdd_type;
@@ -384,20 +382,6 @@ static long ir_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long
 		mutex_lock(&ir->tx_mutex);
 		if ((ir->inf == IR_HW_SPI) || (ir->inf == IR_HW_PWM)) {
 			enable_ir_vdd(ir);
-		}
-
-		if (params->carrier_freq > MAX_FREQUENCY || params->carrier_freq < MIN_FREQUENCY) {
-			vfree(params);
-			pr_err("oplus_ir_core: not support freq!\n");
-			mutex_unlock(&ir->tx_mutex);
-			return -EFAULT;
-		}
-
-		if (params->size > IR_PARAM_MAX_SIZE) {
-			vfree(params);
-			pr_err("oplus_ir_core: params->size too large!\n");
-			mutex_unlock(&ir->tx_mutex);
-			return -ENOMEM;
 		}
 
 		ret = ir->ops->send(ir->priv, params, ir->inf);

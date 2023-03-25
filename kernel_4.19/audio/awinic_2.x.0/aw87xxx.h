@@ -10,12 +10,7 @@
 #include "aw87xxx_acf_bin.h"
 
 #define AW_CFG_UPDATE_DELAY
-
-#ifdef OPLUS_BUG_COMPATIBILITY
-#define AW_CFG_UPDATE_DELAY_TIMER	(13000)
-#else
 #define AW_CFG_UPDATE_DELAY_TIMER	(3000)
-#endif /*OPLUS_BUG_COMPATIBILITY*/
 
 #define AW87XXX_NO_OFF_BIN		(0)
 #define AW87XXX_OFF_BIN_OK		(1)

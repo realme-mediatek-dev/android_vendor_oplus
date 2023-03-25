@@ -217,9 +217,7 @@ static void mm_fb_kevent_upload_work(struct work_struct *work)
 		kevent->count_total = 1;
 		new_kevent = NULL;
 		mm_kevent_len++;
-		mutex_lock(&mm_kevent_lock);
 		list_add_tail(&kevent->head, &mm_kevent_list);
-		mutex_unlock(&mm_kevent_lock);
 		goto done;
 	}
 

@@ -44,7 +44,7 @@ struct hybridswapd_task {
 	struct task_struct *swapd;
 	struct cpumask swapd_bind_cpumask;
 };
-#define PGDAT_ITEM_DATA(pgdat) ((struct hybridswapd_task *)(pgdat)->android_oem_data1)
+#define PGDAT_ITEM_DATA(pgdat) ((struct hybridswapd_task*)(pgdat)->android_oem_data1)
 #define PGDAT_ITEM(pgdat, item) (PGDAT_ITEM_DATA(pgdat)->item)
 
 #define HS_SWAP_ANON_REFAULT_THRESHOLD 22000
@@ -98,7 +98,7 @@ static unsigned long long hs_swap_last_anon_pagefault;
 static unsigned long last_anon_snapshot_time;
 static struct swapd_param zswap_param[SWAPD_MAX_LEVEL_NUM];
 static enum cpuhp_state swapd_online;
-static struct zram *swapd_zram;
+static struct zram *swapd_zram = NULL;
 static u64 max_reclaimin_size = MAX_RECLAIMIN_SZ;
 atomic_long_t fault_out_pause = ATOMIC_LONG_INIT(0);
 atomic_long_t fault_out_pause_cnt = ATOMIC_LONG_INIT(0);
@@ -121,11 +121,6 @@ extern unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *memcg,
 #ifdef CONFIG_OPLUS_JANK
 extern u32 get_cpu_load(u32 win_cnt, struct cpumask *mask);
 #endif
-
-inline bool current_is_hybrid_swapd(void)
-{
-	return current->pid == swapd_pid;
-}
 
 inline u64 get_zram_wm_ratio_value(void)
 {
@@ -500,7 +495,7 @@ void update_swapd_memcg_param(struct mem_cgroup *memcg)
 
 static int update_swapd_memcgs_param(char *buf)
 {
-	static const char delim[] = " ";
+	const char delim[] = " ";
 	char *token = NULL;
 	int level_num;
 	int i;
@@ -1013,11 +1008,11 @@ static int swapd_update_cpumask(struct task_struct *tsk, char *buf,
 	int retval;
 	struct cpumask temp_mask;
 	const struct cpumask *cpumask = cpumask_of_node(pgdat->node_id);
-	struct hybridswapd_task *hyb_task = PGDAT_ITEM_DATA(pgdat);
+	struct hybridswapd_task* hyb_task = PGDAT_ITEM_DATA(pgdat);
 
 	if (unlikely(!hyb_task)) {
 		log_err("set task %s cpumask %s node %d failed, "
-			"hyb_task is NULL\n", tsk->comm, buf, pgdat->node_id);
+				"hyb_task is NULL\n", tsk->comm, buf, pgdat->node_id);
 		return -EINVAL;
 	}
 
@@ -1079,7 +1074,7 @@ static int swapd_bind_read(struct seq_file *m, void *v)
 {
 	int nid;
 	struct pglist_data *pgdat;
-	struct hybridswapd_task *hyb_task;
+	struct hybridswapd_task* hyb_task;
 
 	seq_printf(m, "%4s %s\n", "Node", "mask");
 	for_each_node_state(nid, N_MEMORY) {
@@ -1338,8 +1333,7 @@ bool zram_watermark_ok(void)
 	diff_buffers = diff_buffers * percent_constant / get_nr_zram_total();
 
 	cur_ratio = zram_used * percent_constant / get_nr_zram_total();
-	wm  = min(get_zram_wm_ratio_value(),
-		  get_zram_wm_ratio_value() - diff_buffers);
+	wm  = min(get_zram_wm_ratio_value(), get_zram_wm_ratio_value()- diff_buffers);
 
 	return cur_ratio > wm;
 }
@@ -1426,7 +1420,7 @@ static bool is_cpu_busy(void)
 static void wakeup_swapd(pg_data_t *pgdat)
 {
 	unsigned long curr_interval;
-	struct hybridswapd_task *hyb_task = PGDAT_ITEM_DATA(pgdat);
+	struct hybridswapd_task* hyb_task = PGDAT_ITEM_DATA(pgdat);
 
 	if (!hyb_task || !hyb_task->swapd)
 		return;
@@ -1576,9 +1570,6 @@ static unsigned long swapd_shrink_anon(pg_data_t *pgdat,
 			if (!hybs->can_reclaimed)
 				continue;
 
-			if (is_fg_mem_cgroup(memcg))
-				continue;
-
 			memcg_to_reclaim = reclaim_size_per_cycle * hybs->can_reclaimed / total_can_reclaimed;
 			memcg_nr_reclaimed = try_to_free_mem_cgroup_pages(memcg,
 					memcg_to_reclaim, GFP_KERNEL, true);
@@ -1689,8 +1680,8 @@ static int swapd(void *p)
 {
 	pg_data_t *pgdat = (pg_data_t *)p;
 	struct task_struct *tsk = current;
-	struct hybridswapd_task *hyb_task = PGDAT_ITEM_DATA(pgdat);
-	static unsigned long last_reclaimin_jiffies;
+	struct hybridswapd_task* hyb_task = PGDAT_ITEM_DATA(pgdat);
+	static unsigned long last_reclaimin_jiffies = 0;
 	long fault_out_pause_value;
 	int display_un_blank = 1;
 
@@ -1773,7 +1764,7 @@ int swapd_run(int nid)
 	struct sched_param param = {
 		.sched_priority = DEFAULT_PRIO,
 	};
-	struct hybridswapd_task *hyb_task = PGDAT_ITEM_DATA(pgdat);
+	struct hybridswapd_task* hyb_task = PGDAT_ITEM_DATA(pgdat);
 	int ret;
 
 	if (!hyb_task || hyb_task->swapd)
@@ -1803,7 +1794,7 @@ void swapd_stop(int nid)
 {
 	struct pglist_data *pgdata = NODE_DATA(nid);
 	struct task_struct *swapd;
-	struct hybridswapd_task *hyb_task;
+	struct hybridswapd_task* hyb_task;
 
 	if (unlikely(!PGDAT_ITEM_DATA(pgdata))) {
 		log_err("nid %d pgdata %p PGDAT_ITEM_DATA is NULL\n",
@@ -1825,7 +1816,7 @@ void swapd_stop(int nid)
 static int mem_hotplug_swapd_notifier(struct notifier_block *nb,
 		unsigned long action, void *data)
 {
-	struct memory_notify *arg = (struct memory_notify *)data;
+	struct memory_notify *arg = (struct memory_notify*)data;
 	int nid = arg->status_change_nid;
 
 	if (action == MEM_ONLINE)
@@ -1846,7 +1837,7 @@ static int swapd_cpu_online(unsigned int cpu)
 
 	for_each_node_state(nid, N_MEMORY) {
 		pg_data_t *pgdat = NODE_DATA(nid);
-		struct hybridswapd_task *hyb_task;
+		struct hybridswapd_task* hyb_task;
 		struct cpumask *mask;
 
 		hyb_task = PGDAT_ITEM_DATA(pgdat);
@@ -1924,7 +1915,7 @@ error_out:
 			PGDAT_ITEM(pgdat, swapd) = NULL;
 		}
 
-		kfree((void *)PGDAT_ITEM_DATA(pgdat));
+		kfree((void*)PGDAT_ITEM_DATA(pgdat));
 		pgdat->android_oem_data1 = 0;
 	}
 
@@ -1943,7 +1934,7 @@ static void destroy_swapd_thread(void)
 			continue;
 
 		swapd_stop(nid);
-		kfree((void *)PGDAT_ITEM_DATA(pgdat));
+		kfree((void*)PGDAT_ITEM_DATA(pgdat));
 		pgdat->android_oem_data1 = 0;
 	}
 }

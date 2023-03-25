@@ -576,7 +576,6 @@ static int  setalarm(unsigned long time,bool enable)
 	static struct rtc_device *rtc;
 	static struct rtc_wkalrm alm;
 	static struct rtc_wkalrm org_alm;
-
 	unsigned long now;
 	int rc = -1;
 	static bool store_alm_success = false;
@@ -604,9 +603,9 @@ static int  setalarm(unsigned long time,bool enable)
 			return rc;
 		}
 
-		now = rtc_tm_to_time64(&alm.time);
+		rtc_tm_to_time(&alm.time, &now);
 		memset(&alm, 0, sizeof alm);
-		rtc_time64_to_tm(now + time, &alm.time);
+		rtc_time_to_tm(now + time, &alm.time);
 		alm.enabled = true;
 		rc = rtc_set_alarm(rtc, &alm);
 		if (rc < 0) {

@@ -31,27 +31,11 @@ static unsigned long hash_cal_max_us;
 static struct proc_dir_entry *spentry;
 static struct proc_dir_entry *epentry;
 static struct proc_dir_entry *tpentry;
-#ifdef CONFIG_VMALLOC_VM_DEBUG
-static struct proc_dir_entry *svpentry;
-#endif
 
 extern struct proc_dir_entry *memleak_detect_dir;
 
 #define SET_VM_STACK_HASH(vm, val) (vm->android_oem_data1 = val)
 #define GET_VM_STACK_HASH(vm) ((u32)(vm->android_oem_data1))
-
-#ifdef CONFIG_VMALLOC_VM_DEBUG
-static atomic_long_t vmalloc_vm_used;
-unsigned long get_vmalloc_vm_used(void)
-{
-	return atomic_long_read(&vmalloc_vm_used);
-}
-
-static void remove_vmalloc_stack(void *data, struct vm_struct *vm)
-{
-	atomic_long_sub(vm->size, &vmalloc_vm_used);
-}
-#endif
 
 static void show_stack_hash(void *data, struct seq_file *m,
 		struct vm_struct *v)
@@ -81,10 +65,6 @@ static void save_vmalloc_stack(void *data, unsigned long flags,
 	ml_depot_stack_handle_t handle;
 	unsigned long delay;
 	unsigned long start;
-
-#ifdef CONFIG_VMALLOC_VM_DEBUG
-	atomic_long_add(vm->size, &vmalloc_vm_used);
-#endif
 
 	if (!vmalloc_debug_enable)
 		return;
@@ -218,16 +198,6 @@ int init_vmalloc_debug(void)
 		return ret;
 	}
 
-#ifdef CONFIG_VMALLOC_VM_DEBUG
-	ret = register_trace_android_vh_remove_vmalloc_stack(remove_vmalloc_stack,
-			NULL);
-	if (ret) {
-		ml_depot_destory();
-		pr_err("register_trace_android_vh_save_vmalloc_stack failed\n");
-		return ret;
-	}
-#endif
-
 	ret = register_trace_android_vh_show_stack_hash(show_stack_hash, NULL);
 	if (ret) {
 		unregister_trace_android_vh_save_vmalloc_stack(save_vmalloc_stack,
@@ -282,36 +252,6 @@ static const struct proc_ops vmalloc_used_fops = {
 	.proc_read = vmalloc_used_read,
 };
 
-#ifdef CONFIG_VMALLOC_VM_DEBUG
-static ssize_t vmalloc_vm_used_read(struct file *filp,
-		char __user *buff, size_t count, loff_t *off)
-{
-	char kbuf[KBUF_LEN] = {'\0'};
-	unsigned int len;
-
-	len = scnprintf(kbuf, KBUF_LEN, "%ld\n", atomic_long_read(&vmalloc_vm_used)>>10);
-	if ((len == KBUF_LEN) && (kbuf[len - 1] != '\n'))
-		return -EFAULT;
-
-	if (len > *off)
-		len -= *off;
-	else
-		len = 0;
-
-	if (copy_to_user(buff, kbuf, (len < count ? len : count))) {
-		pr_err("vmalloc_debug : copy to user failed.\n");
-		return -EFAULT;
-	}
-
-	*off += (len < count ? len : count);
-	return (len < count ? len : count);
-}
-
-static const struct proc_ops vmalloc_vm_used_fops = {
-	.proc_read = vmalloc_vm_used_read,
-};
-#endif
-
 int __init create_vmalloc_debug(struct proc_dir_entry *parent)
 {
 	spentry = proc_create("vmalloc_used", S_IRUGO, parent,
@@ -338,33 +278,15 @@ int __init create_vmalloc_debug(struct proc_dir_entry *parent)
 		return -ENOMEM;
 	}
 
-#ifdef CONFIG_VMALLOC_VM_DEBUG
-	svpentry = proc_create("vmalloc_vm_used", S_IRUGO, parent,
-			&vmalloc_vm_used_fops);
-	if (!svpentry) {
-		proc_remove(tpentry);
-		proc_remove(epentry);
-		proc_remove(spentry);
-		pr_err("create vmalloc_vm_used proc failed.\n");
-		return -ENOMEM;
-	}
-#endif
-
 	return 0;
 }
 
 void vmalloc_debug_exit(void)
 {
-#ifdef CONFIG_VMALLOC_VM_DEBUG
-	proc_remove(svpentry);
-#endif
 	proc_remove(tpentry);
 	proc_remove(epentry);
 	proc_remove(spentry);
 	unregister_trace_android_vh_show_stack_hash(show_stack_hash, NULL);
-#ifdef CONFIG_VMALLOC_VM_DEBUG
-	unregister_trace_android_vh_remove_vmalloc_stack(remove_vmalloc_stack, NULL);
-#endif
 	unregister_trace_android_vh_save_vmalloc_stack(save_vmalloc_stack, NULL);
 }
 #endif /* _VMALLOC_DEBUG_ */

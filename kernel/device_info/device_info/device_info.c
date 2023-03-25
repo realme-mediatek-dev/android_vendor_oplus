@@ -20,9 +20,6 @@
 #include <linux/iio/consumer.h>
 #include <linux/of_fdt.h>
 #include <linux/version.h>
-#if !(defined(CONFIG_MTK_PLATFORM) || defined(CONFIG_OPLUS_DEVICE_INFO_MTK_PLATFORM))
-#include <soc/qcom/of_common.h>
-#endif
 
 #define DEVINFO_NAME "devinfo"
 
@@ -443,31 +440,6 @@ static int init_other_hw_ids(struct platform_device *pdev)
 	return 0;
 }
 
-static int get_sub_gpio_val(struct device_node *np, int sub_num)
-{
-	int ret = 0;
-	int gpio_num;
-	int val = 0;
-	char label[INFO_LEN] = { 0 };
-
-	snprintf(label, INFO_LEN, "aboard-gpio%d", sub_num);
-	gpio_num = of_get_named_gpio(np, label, 0);
-	if (gpio_is_valid(gpio_num)) {
-		ret = gpio_request(gpio_num, label);
-		if (ret) {
-			dev_msg("failed to request gpio%d\n", gpio_num);
-			return -EINVAL;
-		}
-
-		val = gpio_get_value(gpio_num);
-		dev_msg("get gpio%d value is %d\n", gpio_num, val);
-		gpio_free(gpio_num);
-	} else {
-		dev_msg("gpio%d not specified\n", gpio_num);
-	}
-
-	return val;
-}
 
 static int gpio_get_submask(struct device_node *np)
 {
@@ -663,7 +635,7 @@ reinit_aboard_id(struct device *dev, struct manufacture_info *info)
 {
 	struct device_node *np;
 	int32_t hw_mask = 0;
-	int i = 0, j = 0, k = 0, ret = 0;
+	int i = 0, j = 0, ret = 0;
 	int id_size = 0;
 	uint32_t *main_val = NULL, *sub_val = NULL, *rf_val = NULL, *region_val = NULL;
 	int active_val = 0, sleep_val = 0;
@@ -708,9 +680,9 @@ reinit_aboard_id(struct device *dev, struct manufacture_info *info)
 			return -ENODEV;
 		}
 
-		id_size = of_property_count_elems_of_size(np, "aboard-patterns", sizeof(uint32_t));
-		dev_msg("id_size is %d\n", id_size);
-
+		id_size =
+			of_property_count_elems_of_size(np, "aboard-patterns",
+				sizeof(uint32_t));
 		if (id_size > MAIN_BOARD_SUPPORT) {
 			return -ENODEV;
 		} else if (id_size == -EINVAL) {
@@ -720,43 +692,23 @@ reinit_aboard_id(struct device *dev, struct manufacture_info *info)
 			goto seccess;
 		}
 
-		if (of_property_count_elems_of_size(np, "match-projects", sizeof(uint32_t)) > 0) {
-			if (!sub_val) {/* not alloc twice for A2 board */
-				sub_val = (uint32_t *) kzalloc(sizeof(uint32_t) * id_size, GFP_KERNEL);
-				if (!sub_val) {
-					dev_msg("[board%d]sub_val alloc failed\n", i);
-					return -ENOMEM;
-				}
+		if (!sub_val) {
+			sub_val = (uint32_t *) kzalloc(sizeof(uint32_t) * id_size, GFP_KERNEL);
+			if (!sub_val) {
+				return -ENOMEM;
 			}
 
 			of_property_read_u32_array(np, "aboard-patterns", sub_val, id_size);
-			for(k = 0; k < id_size ; k++) {
-				dev_msg("[board%d]sub_val is (%u)\n", i, *(sub_val + k));
-			}
-		} else {
-			sub_val = NULL;
-			dev_msg("sub_val not specified\n");
 		}
 
-		if (of_property_count_elems_of_size(np, "match-projects", sizeof(uint32_t)) > 0) {
-			if (!main_val) {/* not alloc twice for A2 board */
-				main_val = (uint32_t *) kzalloc(sizeof(uint32_t) * id_size, GFP_KERNEL);
-				if (!main_val) {
-					if (sub_val) {
-						kfree(sub_val);
-					}
-					dev_msg("main_val alloc failed\n");
-					return -ENOMEM;
-				}
+		if (!main_val) {
+			main_val = (uint32_t *) kzalloc(sizeof(uint32_t) * id_size, GFP_KERNEL);
+			if (!main_val) {
+				kfree(sub_val);
+				return -ENOMEM;
 			}
 
 			of_property_read_u32_array(np, "match-projects", main_val, id_size);
-			for(k = 0; k < id_size ; k++) {
-				dev_msg("[board%d]main_val is (%u)\n", i, *(main_val + k));
-			}
-		} else {
-			main_val = NULL;
-			dev_msg("main_val not specified\n");
 		}
 
 		if (of_property_read_bool(np, "rf_match_support")) {
@@ -768,44 +720,32 @@ reinit_aboard_id(struct device *dev, struct manufacture_info *info)
 				if (sub_val) {
 					kfree(sub_val);
 				}
-				dev_msg("rf_val alloc failed\n");
 				return -ENOMEM;
 			}
 
 			of_property_read_u32_array(np, "rf-patterns", rf_val, id_size);
-			for(k = 0; k < id_size ; k++) {
-				dev_msg("[board%d]rf_val is (%u)\n", i, *(rf_val + k));
-			}
 		} else {
 			rf_val = NULL;
-			dev_msg("rf_val not specified\n");
 		}
 
 		if (of_property_count_elems_of_size(np, "region-patterns", sizeof(uint32_t)) > 0) {
-			if (!region_val) {/* not alloc twice for A2 board */
-				region_val = (uint32_t *) kzalloc(sizeof(uint32_t) * id_size, GFP_KERNEL);
-				if (!region_val) {
-					if (main_val) {
-						kfree(main_val);
-					}
-					if (sub_val) {
-						kfree(sub_val);
-					}
-					if (rf_val) {
-						kfree(rf_val);
-					}
-					dev_msg("region_val alloc failed\n");
-					return -ENOMEM;
+			region_val = (uint32_t *) kzalloc(sizeof(uint32_t) * id_size, GFP_KERNEL);
+			if (!region_val) {
+				if (main_val) {
+					kfree(main_val);
 				}
+				if (sub_val) {
+					kfree(sub_val);
+				}
+				if (rf_val) {
+					kfree(rf_val);
+				}
+				return -ENOMEM;
 			}
 
 			of_property_read_u32_array(np, "region-patterns", region_val, id_size);
-			for(k = 0; k < id_size ; k++) {
-				dev_msg("[board%d]region_val is (%u)\n", i, *(region_val + k));
-			}
 		} else {
 			region_val = NULL;
-			dev_msg("region_val not specified\n");
 		}
 
 		if (of_property_read_bool(np, "use_pmic_adc")) {
@@ -819,7 +759,7 @@ reinit_aboard_id(struct device *dev, struct manufacture_info *info)
 			set_gpios_active(dev_info);
 			active_val = gpio_get_submask(np);
 			set_gpios_sleep(dev_info);
-			sleep_val = gpio_get_submask(np);
+			sleep_val  = gpio_get_submask(np);
 			set_gpios_idle(dev_info);
 			if (active_val == 1 && sleep_val == 0) {		/*high-resistance*/
 				hw_mask = 0;
@@ -827,29 +767,9 @@ reinit_aboard_id(struct device *dev, struct manufacture_info *info)
 				hw_mask = 2;
 			} else if (active_val == 0 && sleep_val == 0) {		/*external pull-down*/
 				hw_mask = 1;
-			} else {
-				/* (active_val == 0 && sleep_val == 1) */
-				dev_msg("never enter here...\n");
 			}
-			dev_msg("board[%d]:active_val[%d] sleep_val[%d] hw_mask[%d]\n", i, active_val, sleep_val, hw_mask);
-		} else if (of_property_read_bool(np, "use_double_tristate_gpio")) {
-			dev_msg("double tristate gpio judgement\n");
-			set_gpios_active(dev_info);
-			active_val = get_sub_gpio_val(np, i);
-			set_gpios_sleep(dev_info);
-			sleep_val = get_sub_gpio_val(np, i);
-			set_gpios_idle(dev_info);
-			if (active_val == 1 && sleep_val == 0) {		/*high-resistance*/
-				hw_mask = 0;
-			} else if (active_val == 1 && sleep_val == 1) {		/*external pull-up*/
-				hw_mask = 2;
-			} else if (active_val == 0 && sleep_val == 0) {		/*external pull-down*/
-				hw_mask = 1;
-			} else {
-				/* (active_val == 0 && sleep_val == 1) */
-				dev_msg("never enter here...\n");
-			}
-			dev_msg("board[%d]:active_val[%d] sleep_val[%d] hw_mask[%d]\n", i, active_val, sleep_val, hw_mask);
+			dev_msg("active_val[%d] sleep_val[%d] hw_mask[%d]\n", active_val, sleep_val, hw_mask);
+		/*#endif OPLUS_FEATURE_TP_BASIC*/
 		} else {
 			dev_msg("normal gpio judgement\n");
 			set_gpios_active(dev_info);
@@ -868,15 +788,14 @@ reinit_aboard_id(struct device *dev, struct manufacture_info *info)
 		for (j = 0; j < id_size; j++) {
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_OPROJECT)
 			if (* (main_val + j) != get_project()) {
-				dev_msg("board[%d]:main_val[%d] is %d\n", i, j, * (main_val + j));
 				continue;
 			}
-			dev_msg("board[%d]:project[%d] is %d\n", i, j, get_project());
+			dev_msg("project is %d\n", get_project());
 #endif
 
 			if (* (sub_val + j) == hw_mask) {
 				if (!rf_val) {
-					dev_msg("board[%d]:rf_val is null, matched\n", i);
+					dev_msg("rf_val is null, matched\n");
 					match = true;
 				} else {
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_OPROJECT)
@@ -893,9 +812,8 @@ reinit_aboard_id(struct device *dev, struct manufacture_info *info)
 
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_OPROJECT)
 				if (match && region_val) {
-					dev_msg("board[%d]:region is %d\n", i, get_Operator_Version());
+					dev_msg("region is %d\n", get_Operator_Version());
 					if (* (region_val + j) != get_Operator_Version()) {
-						dev_msg("board[%d]:region_val[%d] is (%u) not match\n", i, j, * (region_val + j));
 						match = false;
 					}
 				}

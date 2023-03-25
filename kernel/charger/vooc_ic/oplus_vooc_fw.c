@@ -93,10 +93,6 @@ void init_hw_version(void)
 {
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-bool __attribute__((weak)) qpnp_is_charger_reboot(void);
-bool __attribute__((weak)) qpnp_is_power_off_charging(void);
-#else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
 /* only for GKI compile */
 bool __attribute__((weak)) qpnp_is_charger_reboot(void)
@@ -108,7 +104,6 @@ bool __attribute__((weak)) qpnp_is_power_off_charging(void)
 {
 	return false;
 }
-#endif
 #endif
 
 extern	int oplus_vooc_mcu_hwid_check(struct oplus_vooc_chip *chip);

@@ -96,6 +96,7 @@ static int hans_add_uid_hash(uid_t target_uid, int persistent) {
 	hash_for_each_possible(uid_map, info, hnode, target_uid) {
 		if(info->uid == target_uid) {
 			spin_unlock_irqrestore(&map_lock, flags);
+			printk(KERN_WARNING "hans uid %d is already in uid_map\n", target_uid);
 			return -1;
 		}
 	}
